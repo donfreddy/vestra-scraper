@@ -8,9 +8,9 @@ export interface BrowserDriverOptions {
   locale?: string;
   timezone?: string;
   proxies?: ProxyConfig[];
-  /** Pages ouvertes simultanément. */
+  /** Pages opened simultaneously. */
   concurrency?: number;
-  /** Cadence des navigations `withPage`. */
+  /** Rate of `withPage` navigations. */
   navigationRate?: { maxRequests: number; intervalMs: number };
   navigationTimeoutMs?: number;
   logger: Logger;
@@ -20,9 +20,9 @@ const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
 /**
- * Abstraction du navigateur headless. Une instance = un `Browser` Chromium,
- * réutilisé entre les navigations. `withPage` sérialise/limite les ouvertures
- * de page et applique le proxy courant.
+ * Headless-browser abstraction. One instance = one Chromium `Browser`,
+ * reused across navigations. `withPage` serializes/limits page openings
+ * and applies the current proxy.
  */
 export class BrowserDriver {
   private browser: Browser | undefined;
@@ -50,7 +50,7 @@ export class BrowserDriver {
 
   private async ensureBrowser(): Promise<Browser> {
     if (this.browser) return this.browser;
-    this.log.debug(`lancement de Chromium (headless=${this.opts.headless})`);
+    this.log.debug(`launching Chromium (headless=${this.opts.headless})`);
     this.browser = await chromium.launch({
       headless: this.opts.headless,
       args: ['--disable-blink-features=AutomationControlled', '--no-sandbox'],
@@ -78,7 +78,7 @@ export class BrowserDriver {
     });
     context.setDefaultNavigationTimeout(this.opts.navigationTimeoutMs);
     context.setDefaultTimeout(this.opts.navigationTimeoutMs);
-    // Masque `navigator.webdriver`.
+    // Hide `navigator.webdriver`.
     await context.addInitScript(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
     });
@@ -86,8 +86,8 @@ export class BrowserDriver {
   }
 
   /**
-   * Ouvre un contexte + une page isolés, exécute `fn`, puis nettoie.
-   * Respecte la limite de concurrence et la cadence de navigation.
+   * Opens an isolated context + page, runs `fn`, then cleans up.
+   * Respects the concurrency limit and the navigation rate.
    */
   async withPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
     return this.rateLimiter.schedule(async () => {

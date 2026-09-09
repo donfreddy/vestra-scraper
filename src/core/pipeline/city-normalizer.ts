@@ -1,6 +1,6 @@
 /**
- * Normalisation des noms de villes (principales agglomérations du Cameroun +
- * variantes fréquentes). Sert au dédoublonnage et à l'homogénéité du livrable
+ * Normalization of city names (main Cameroonian agglomerations +
+ * frequent variants). Used for deduplication and deliverable consistency
  * ("Dla", "DOUALA", "douala " -> "Douala").
  */
 
@@ -29,7 +29,7 @@ function stripDiacritics(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-/** Version canonique lisible (avec accents) d'un nom de ville. */
+/** Canonical readable version (with accents) of a city name. */
 export function normalizeCity(raw: string | undefined): string {
   if (!raw) return '';
   const cleaned = raw
@@ -50,7 +50,7 @@ export function normalizeCity(raw: string | undefined): string {
     .join(' ');
 }
 
-/** Clé insensible casse/accents pour comparer deux villes. */
+/** Case/accent-insensitive key used to compare two cities. */
 export function cityKey(raw: string | undefined): string {
   return stripDiacritics(normalizeCity(raw)).toLowerCase().replace(/[^a-z0-9]/g, '');
 }

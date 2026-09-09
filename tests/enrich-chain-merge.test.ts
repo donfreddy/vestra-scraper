@@ -7,13 +7,13 @@ const lead = (over: Partial<Parameters<typeof normalizeLead>[0]> = {}) =>
   normalizeLead({ source: 'google-maps', companyName: 'X', city: 'Douala', ...over });
 
 describe('detectChains', () => {
-  it('marque une enseigne connue', () => {
+  it('marks a known brand', () => {
     const leads = [lead({ companyName: 'Hilton Yaoundé', city: 'Yaoundé' })];
     detectChains(leads);
     expect(leads[0]!.chain).toMatchObject({ isChain: true, name: 'Hilton' });
   });
 
-  it('détecte une marque présente dans plusieurs villes', () => {
+  it('detects a brand present in several cities', () => {
     const leads = [
       lead({ companyName: 'Hôtel La Falaise', city: 'Douala' }),
       lead({ companyName: 'Hôtel La Falaise', city: 'Yaoundé' }),
@@ -26,7 +26,7 @@ describe('detectChains', () => {
 });
 
 describe('applyPatch', () => {
-  it('fusionne sans écraser et trace l’enricher', () => {
+  it('merges without overwriting and tracks the enricher', () => {
     const base = lead({ companyName: 'Hôtel Test', email: 'contact@test.cm' });
     const merged = applyPatch(
       base,
@@ -39,7 +39,7 @@ describe('applyPatch', () => {
       },
       'website',
     );
-    expect(merged.email).toBe('contact@test.cm'); // pas écrasé
+    expect(merged.email).toBe('contact@test.cm'); // not overwritten
     expect(merged.emails).toEqual(['contact@test.cm', 'reservation@test.cm']);
     expect(merged.socials.facebook).toBe('https://facebook.com/test');
     expect(merged.emailStatus).toBe('valid');

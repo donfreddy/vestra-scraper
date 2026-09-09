@@ -6,7 +6,7 @@ import type { B2BLead } from '../types/lead.entity.js';
 import type { ExporterResult, ILeadExporter } from '../types/exporter.interface.js';
 import { LEAD_COLUMNS, flattenLead } from './flatten.js';
 
-/** Export CSV (séparateur `;`, BOM UTF-8 pour Excel FR). */
+/** CSV export (`;` separator, UTF-8 BOM for French Excel). */
 export class CsvExporter implements ILeadExporter {
   readonly name = 'csv';
   private fileStream: WriteStream | undefined;
@@ -31,13 +31,13 @@ export class CsvExporter implements ILeadExporter {
   }
 
   async write(lead: B2BLead): Promise<void> {
-    if (!this.stringifier) throw new Error('CsvExporter: open() non appelé');
+    if (!this.stringifier) throw new Error('CsvExporter: open() not called');
     this.stringifier.write(flattenLead(lead));
     this.count += 1;
   }
 
   async close(): Promise<ExporterResult> {
-    if (!this.stringifier || !this.fileStream) throw new Error('CsvExporter: open() non appelé');
+    if (!this.stringifier || !this.fileStream) throw new Error('CsvExporter: open() not called');
     const done = new Promise<void>((res, rej) => {
       this.fileStream!.on('error', rej);
       this.fileStream!.on('finish', () => res());

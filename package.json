@@ -1,7 +1,7 @@
 {
   "name": "vestra",
   "version": "0.1.0",
-  "description": "Vestra — extraction et enrichissement de leads B2B (Google Maps, annuaires) en Node.js/TypeScript, sans API tierce payante.",
+  "description": "Vestra. B2B lead extraction and enrichment (Google Maps, directories) in Node.js/TypeScript, without a paid third-party API.",
   "type": "module",
   "packageManager": "yarn@4.12.0",
   "main": "dist/index.js",
@@ -22,7 +22,7 @@
     "cli": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "playwright install chromium || echo 'playwright: exécuter `yarn playwright install chromium` manuellement'",
+    "postinstall": "playwright install chromium || echo 'playwright: run `yarn playwright install chromium` manually'",
     "link:local": "yarn build && npm link"
   },
   "dependencies": {

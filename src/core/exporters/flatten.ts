@@ -1,47 +1,47 @@
 import type { B2BLead } from '../types/lead.entity.js';
 
-/** Colonnes du livrable client, dans l'ordre, avec en-têtes lisibles. */
+/** Deliverable columns, in order, with readable headers. */
 export const LEAD_COLUMNS = [
-  ['companyName', "Nom de l'établissement"],
-  ['legalName', 'Raison sociale'],
-  ['category', 'Catégorie'],
-  ['chain', 'Chaîne'],
-  ['city', 'Ville'],
-  ['country', 'Pays'],
-  ['address', 'Adresse complète'],
-  ['phoneNormalized', 'Téléphone'],
-  ['phones', 'Téléphones (tous)'],
-  ['email', 'Email général'],
-  ['emailStatus', 'Statut email'],
-  ['emails', 'Emails (tous)'],
-  ['websiteUrl', 'Site web'],
+  ['companyName', 'Establishment name'],
+  ['legalName', 'Legal name'],
+  ['category', 'Category'],
+  ['chain', 'Chain'],
+  ['city', 'City'],
+  ['country', 'Country'],
+  ['address', 'Full address'],
+  ['phoneNormalized', 'Phone'],
+  ['phones', 'Phones (all)'],
+  ['email', 'General email'],
+  ['emailStatus', 'Email status'],
+  ['emails', 'Emails (all)'],
+  ['websiteUrl', 'Website'],
   ['linkedin', 'LinkedIn'],
   ['facebook', 'Facebook'],
   ['instagram', 'Instagram'],
   ['whatsapp', 'WhatsApp'],
-  ['googleRating', 'Note Google'],
-  ['reviewsCount', 'Nb avis'],
-  ['reviewsSentiment', 'Sentiment avis'],
-  ['reviewsSummary', 'Résumé avis'],
-  ['contactName', 'Contact décideur'],
-  ['contactRole', 'Poste décideur'],
-  ['contactEmail', 'Email décideur'],
-  ['contactLinkedin', 'LinkedIn décideur'],
+  ['googleRating', 'Google rating'],
+  ['reviewsCount', 'Reviews count'],
+  ['reviewsSentiment', 'Reviews sentiment'],
+  ['reviewsSummary', 'Reviews summary'],
+  ['contactName', 'Decision-maker contact'],
+  ['contactRole', 'Decision-maker role'],
+  ['contactEmail', 'Decision-maker email'],
+  ['contactLinkedin', 'Decision-maker LinkedIn'],
   ['source', 'Source'],
-  ['sourceUrl', 'Lien source'],
+  ['sourceUrl', 'Source link'],
   ['id', 'ID'],
 ] as const;
 
 export type FlatLead = Record<(typeof LEAD_COLUMNS)[number][0], string | number>;
 
-/** Aplati un lead : on remonte le 1er contact "le plus fiable" sur la ligne. */
+/** Flattens a lead: the most reliable contact is lifted onto the row. */
 export function flattenLead(lead: B2BLead): FlatLead {
   const best = [...lead.contacts].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
   return {
     companyName: lead.companyName,
     legalName: lead.legalName ?? '',
     category: lead.category ?? '',
-    chain: lead.chain?.isChain ? (lead.chain.name ?? 'Oui') : '',
+    chain: lead.chain?.isChain ? (lead.chain.name ?? 'Yes') : '',
     city: lead.city,
     country: lead.country,
     address: lead.address ?? '',

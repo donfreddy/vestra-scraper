@@ -10,45 +10,45 @@ const program = new Command();
 
 program
   .name('vestra')
-  .description('Vestra — extraction et enrichissement de leads B2B (Google Maps, annuaires)')
+  .description('Vestra. B2B lead extraction and enrichment (Google Maps, directories)')
   .version('0.1.0');
 
 program
   .command('extract')
-  .description("Lance une session d'extraction et exporte le résultat")
-  .requiredOption('-q, --query <terme>', 'Terme métier, ex: "Hôtel"')
-  .requiredOption('-l, --location <zone>', 'Zone cible, ex: "Douala, Cameroun"')
+  .description("Runs an extraction session and exports the result")
+  .requiredOption('-q, --query <term>', 'Business term, e.g. "Hotel"')
+  .requiredOption('-l, --location <area>', 'Target area, e.g. "Douala, Cameroon"')
   .addOption(
-    new Option('-s, --source <source>', 'Source de collecte')
+    new Option('-s, --source <source>', 'Collection source')
       .choices(['gmaps', 'google-maps'])
       .default('gmaps'),
   )
-  .option('-o, --output <fichier>', 'Fichier de sortie (.xlsx | .csv | .json)', './out/leads.xlsx')
-  .addOption(new Option('-f, --format <format>', "Force le format d'export").choices(['excel', 'csv', 'json']))
-  .option('-c, --country <iso2>', 'Pays ISO-2 pour la normalisation des téléphones', 'CM')
-  .option('-n, --limit <n>', 'Nombre max de fiches (0 = illimité)', '0')
+  .option('-o, --output <file>', 'Output file (.xlsx | .csv | .json)', './out/leads.xlsx')
+  .addOption(new Option('-f, --format <format>', 'Force the export format').choices(['excel', 'csv', 'json']))
+  .option('-c, --country <iso2>', 'ISO-2 country for phone normalization', 'CM')
+  .option('-n, --limit <n>', 'Max number of records (0 = unlimited)', '0')
   .option(
-    '-e, --enrich <liste>',
-    'Enrichissement : "website", "email", "reviews", combinés par virgule, ou "all"',
+    '-e, --enrich <list>',
+    'Enrichment: "website", "email", "reviews", comma-separated, or "all"',
   )
   .addOption(
-    new Option('--log-level <niveau>', 'Verbosité')
+    new Option('--log-level <level>', 'Verbosity')
       .choices(['debug', 'info', 'warn', 'error', 'silent'])
       .default('info'),
   )
   .action(async (opts) => {
     const startedAt = Date.now();
-    console.error(chalk.bold.cyan('\n  vestra — extraction\n'));
+    console.error(chalk.bold.cyan('\n  vestra extraction\n'));
 
     const engine = new ScraperEngine({ logLevel: opts.logLevel as LogLevel });
     const controller = new AbortController();
     const onSigint = () => {
-      console.error(chalk.yellow('\n  interruption — fin propre en cours...'));
+      console.error(chalk.yellow('\n  interruption, shutting down cleanly...'));
       controller.abort();
     };
     process.on('SIGINT', onSigint);
 
-    const spinner = ora({ text: `Collecte : "${opts.query}" @ "${opts.location}"`, stream: process.stderr });
+    const spinner = ora({ text: `Collecting: "${opts.query}" @ "${opts.location}"`, stream: process.stderr });
     if (opts.logLevel === 'info') spinner.start();
 
     try {
@@ -66,10 +66,10 @@ program
 
       spinner.stop();
       const s = result.stats;
-      console.error(chalk.green(`\n  ✓ ${s.accepted} leads exportés`) + chalk.gray(` (${result.export.location})`));
+      console.error(chalk.green(`\n  ✓ ${s.accepted} leads exported`) + chalk.gray(` (${result.export.location})`));
       console.error(
         chalk.gray(
-          `    reçus ${s.received} · doublons ${s.duplicates} · invalides ${s.invalid} · ${(
+          `    received ${s.received} · duplicates ${s.duplicates} · invalid ${s.invalid} · ${(
             (Date.now() - startedAt) /
             1000
           ).toFixed(1)}s`,
@@ -79,14 +79,14 @@ program
         const e = result.enrichment;
         console.error(
           chalk.gray(
-            `    enrichis ${e.leadsEnriched}/${s.accepted} via ${e.enrichers.join('+')} · chaînes ${e.chainsDetected}`,
+            `    enriched ${e.leadsEnriched}/${s.accepted} via ${e.enrichers.join('+')} · chains ${e.chainsDetected}`,
           ),
         );
       }
       console.error('');
     } catch (error) {
       spinner.stop();
-      console.error(chalk.red(`\n  ✗ Échec : ${(error as Error).message}\n`));
+      console.error(chalk.red(`\n  ✗ Failed: ${(error as Error).message}\n`));
       process.exitCode = 1;
     } finally {
       process.off('SIGINT', onSigint);

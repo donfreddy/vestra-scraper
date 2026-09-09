@@ -13,15 +13,15 @@ function companyKey(name: string): string {
 export interface DedupeDecision {
   duplicate: boolean;
   reason?: 'name+city' | 'phone' | 'website';
-  /** Id du lead déjà vu qui a provoqué le rejet. */
+  /** Id of the already seen lead that triggered the rejection. */
   matchedId?: string;
 }
 
 /**
- * Détecte les doublons sur trois signaux successifs :
- *  1. nom d'entreprise normalisé + ville
- *  2. téléphone E.164
- *  3. domaine du site web
+ * Detects duplicates on three successive signals:
+ *  1. normalized company name + city
+ *  2. E.164 phone
+ *  3. website domain
  */
 export class Deduplicator {
   private readonly byNameCity = new Map<string, string>();
@@ -52,7 +52,7 @@ export class Deduplicator {
     return { duplicate: false };
   }
 
-  /** Enregistre le lead comme "vu". À n'appeler que pour les non-doublons. */
+  /** Records the lead as "seen". Only call this for non-duplicates. */
   remember(lead: B2BLead): void {
     if (companyKey(lead.companyName)) {
       this.byNameCity.set(`${companyKey(lead.companyName)}::${cityKey(lead.city)}`, lead.id);
@@ -62,7 +62,7 @@ export class Deduplicator {
     if (domain) this.byDomain.set(domain, lead.id);
   }
 
-  /** Combine `inspect` + `remember`. Retourne `true` si le lead est un doublon. */
+  /** Combines `inspect` + `remember`. Returns `true` if the lead is a duplicate. */
   isDuplicate(lead: B2BLead): boolean {
     const decision = this.inspect(lead);
     if (!decision.duplicate) this.remember(lead);

@@ -3,7 +3,7 @@ import type { HttpDriver } from '../driver/http.driver.js';
 import type { BrowserDriver } from '../driver/browser.driver.js';
 import type { Logger } from '../logger.js';
 
-/** Fragment de lead retourné par un enricher, fusionné dans le lead d'origine. */
+/** Lead fragment returned by an enricher, merged into the original lead. */
 export type LeadPatch = Partial<
   Pick<
     B2BLead,
@@ -28,17 +28,17 @@ export interface EnrichContext {
   logger: Logger;
   country: string;
   signal?: AbortSignal;
-  /** Clé API Anthropic (résumé d'avis). Absente => l'enricher dégrade proprement. */
+  /** Anthropic API key (review summary). Absent => the enricher degrades cleanly. */
   anthropicApiKey?: string;
 }
 
 /**
- * Contrat d'un enricher : prend un lead validé, retourne un patch à fusionner.
- * Ne doit jamais lever : en cas d'échec réseau, retourner `{}` et logger.
+ * Contract of an enricher: takes a validated lead, returns a patch to merge.
+ * Must never throw: on network failure, return `{}` and log.
  */
 export interface IEnricher {
   readonly name: string;
-  /** `false` => lead ignoré par cet enricher (ex: pas de site web). */
+  /** `false` => lead ignored by this enricher (e.g. no website). */
   supports(lead: B2BLead): boolean;
   enrich(lead: B2BLead, ctx: EnrichContext): Promise<LeadPatch>;
 }

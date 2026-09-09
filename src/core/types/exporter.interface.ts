@@ -1,23 +1,23 @@
 import type { B2BLead } from './lead.entity.js';
 
 /**
- * Cible de persistance des leads. Le mode streaming (`open`/`write`/`close`)
- * évite d'accumuler tous les résultats en mémoire pour les gros volumes.
+ * Lead persistence target. The streaming mode (`open`/`write`/`close`)
+ * avoids accumulating all results in memory for large volumes.
  */
 export interface ILeadExporter {
   readonly name: string;
-  /** Préparation (ouverture de fichier, connexion, en-têtes...). */
+  /** Preparation (file open, connection, headers...). */
   open(): Promise<void>;
-  /** Persiste un lead validé. Peut être appelé de nombreuses fois. */
+  /** Persists a validated lead. Can be called many times. */
   write(lead: B2BLead): Promise<void>;
-  /** Finalisation (flush, fermeture, retourne un résumé lisible). */
+  /** Finalization (flush, close, returns a readable summary). */
   close(): Promise<ExporterResult>;
 }
 
 export interface ExporterResult {
   target: string;
   count: number;
-  /** Chemin de fichier produit, le cas échéant. */
+  /** Produced file path, if any. */
   location?: string;
 }
 

@@ -6,9 +6,9 @@ import { toRawLead, type GmapsPlaceRaw } from './gmaps.parser.js';
 
 export interface GoogleMapsScraperOptions {
   browser: BrowserDriver;
-  /** Pause max sans nouveau résultat pendant le scroll avant d'arrêter (ms). */
+  /** Max pause without a new result while scrolling before stopping (ms). */
   scrollIdleMs?: number;
-  /** Nombre max de cycles de scroll (garde-fou). */
+  /** Max number of scroll cycles (safety guard). */
   maxScrolls?: number;
 }
 
@@ -19,7 +19,7 @@ const CONSENT_SELECTORS = [
   '#L2AGLb',
 ];
 
-/** Corps d'extraction exécuté dans le contexte de la page (chaîne = non transpilé). */
+/** Extraction body executed in the page context (string = not transpiled). */
 const PLACE_EXTRACTION_JS = `(() => {
   const text = (sel) => { const el = document.querySelector(sel); return (el && el.textContent ? el.textContent.trim() : '') || undefined; };
   const attr = (sel, name) => { const el = document.querySelector(sel); return (el && el.getAttribute(name)) || undefined; };
@@ -60,11 +60,11 @@ const PLACE_EXTRACTION_JS = `(() => {
 })()`;
 
 /**
- * Stratégie Google Maps via Playwright.
+ * Google Maps strategy via Playwright.
  *
- * Limites connues : Google plafonne une recherche à ~120 résultats par zone.
- * Pour couvrir une grande ville exhaustivement, lancer plusieurs requêtes
- * ciblées (quartiers) et laisser le pipeline dédoublonner.
+ * Known limits: Google caps a search at ~120 results per area. To cover a
+ * large city exhaustively, run several targeted queries (neighborhoods) and
+ * let the pipeline deduplicate.
  */
 export class GoogleMapsScraper implements IScraper {
   readonly name = 'google-maps';
@@ -81,16 +81,16 @@ export class GoogleMapsScraper implements IScraper {
     const searchUrl = this.buildSearchUrl(query);
     const fallbackCity = query.location.split(',')[0]?.trim();
 
-    // 1. Collecte des URLs de fiches (page liste + scroll).
+    // 1. Collect place URLs (list page + scroll).
     const placeUrls = await this.options.browser.withPage(async (page) => {
       await this.dismissConsent(page);
-      log.info(`ouverture de la recherche: ${query.query} @ ${query.location}`);
+      log.info(`opening search: ${query.query} @ ${query.location}`);
       await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
       await this.dismissConsent(page);
 
       const detail = await this.tryExtractSinglePlace(page);
       if (detail) {
-        // Google a redirigé directement vers une fiche unique.
+        // Google redirected directly to a single place.
         return { single: detail, urls: [] as string[] };
       }
 
@@ -104,13 +104,13 @@ export class GoogleMapsScraper implements IScraper {
       return;
     }
 
-    log.info(`${placeUrls.urls.length} fiches à visiter`);
+    log.info(`${placeUrls.urls.length} places to visit`);
 
-    // 2. Visite de chaque fiche pour extraire les détails.
+    // 2. Visit each place to extract the details.
     let done = 0;
     for (const url of placeUrls.urls) {
       if (ctx.signal?.aborted) {
-        log.warn('interruption demandée, arrêt de la collecte');
+        log.warn('interruption requested, stopping collection');
         return;
       }
       if (query.limit && done >= query.limit) return;
@@ -127,7 +127,7 @@ export class GoogleMapsScraper implements IScraper {
           yield toRawLead(place, { fallbackCity, country: query.country });
         }
       } catch (error) {
-        log.warn(`échec extraction fiche: ${(error as Error).message}`);
+        log.warn(`place extraction failed: ${(error as Error).message}`);
       }
     }
   }
@@ -176,7 +176,7 @@ export class GoogleMapsScraper implements IScraper {
       const added = await grab();
       if (added > 0) {
         stableSince = Date.now();
-        log.debug(`+${added} fiches (total ${seen.size})`);
+        log.debug(`+${added} places (total ${seen.size})`);
       } else if (Date.now() - stableSince > this.scrollIdleMs) {
         break;
       }
@@ -189,16 +189,17 @@ export class GoogleMapsScraper implements IScraper {
   }
 
   /**
-   * Extraction depuis le panneau latéral d'une fiche ouverte.
-   * Passé sous forme de chaîne à `page.evaluate` : évite que le transpileur
-   * (esbuild/tsx) injecte des helpers (`__name`) indéfinis dans le contexte page.
+   * Extraction from the side panel of an opened place.
+   * Passed as a string to `page.evaluate`: prevents the transpiler
+   * (esbuild/tsx) from injecting helpers (`__name`) that are undefined in the
+   * page context.
    */
   private async extractPlaceDetails(page: Page): Promise<GmapsPlaceRaw | null> {
     const result = await page.evaluate(PLACE_EXTRACTION_JS);
     return (result as GmapsPlaceRaw | null) ?? null;
   }
 
-  /** Cas où la recherche ouvre directement une fiche unique. */
+  /** Case where the search directly opens a single place. */
   private async tryExtractSinglePlace(page: Page): Promise<GmapsPlaceRaw | null> {
     if (!/\/maps\/place\//.test(page.url())) return null;
     await page.waitForSelector('h1', { timeout: 10_000 }).catch(() => undefined);

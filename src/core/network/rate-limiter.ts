@@ -1,17 +1,17 @@
 import PQueue from 'p-queue';
 
 export interface RateLimiterOptions {
-  /** Nombre max de tâches démarrées par fenêtre. */
+  /** Max number of tasks started per window. */
   maxRequests: number;
-  /** Durée de la fenêtre glissante, en millisecondes. */
+  /** Length of the sliding window, in milliseconds. */
   intervalMs: number;
-  /** Concurrence maximale simultanée (défaut : `maxRequests`). */
+  /** Maximum simultaneous concurrency (default: `maxRequests`). */
   concurrency?: number;
 }
 
 /**
- * Limiteur de débit à fenêtre glissante basé sur `p-queue`.
- * Garantit au plus `maxRequests` démarrages par `intervalMs`.
+ * Sliding-window rate limiter built on `p-queue`.
+ * Guarantees at most `maxRequests` starts per `intervalMs`.
  */
 export class RateLimiter {
   private readonly queue: PQueue;
@@ -25,12 +25,12 @@ export class RateLimiter {
     });
   }
 
-  /** Exécute `fn` en respectant le budget de débit. */
+  /** Runs `fn` while respecting the rate budget. */
   schedule<T>(fn: () => Promise<T>): Promise<T> {
     return this.queue.add(fn, { throwOnTimeout: true }) as Promise<T>;
   }
 
-  /** Attend la fin de toutes les tâches en file. */
+  /** Waits for all queued tasks to finish. */
   onIdle(): Promise<void> {
     return this.queue.onIdle();
   }

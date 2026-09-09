@@ -27,7 +27,7 @@ afterAll(async () => {
 });
 
 describe('resolveFormat', () => {
-  it('déduit le format depuis l’extension', () => {
+  it('infers the format from the extension', () => {
     expect(resolveFormat('a/b.csv')).toBe('csv');
     expect(resolveFormat('a/b.json')).toBe('json');
     expect(resolveFormat('a/b.xlsx')).toBe('excel');
@@ -36,7 +36,7 @@ describe('resolveFormat', () => {
 });
 
 describe('exporters', () => {
-  it('JsonExporter écrit un tableau JSON valide', async () => {
+  it('JsonExporter writes a valid JSON array', async () => {
     dir ||= await mkdtemp(join(tmpdir(), 'scraper-'));
     const path = join(dir, 'out.json');
     const exp = createExporter('json', path);
@@ -50,7 +50,7 @@ describe('exporters', () => {
     expect(parsed[0]!.companyName).toBe('Hôtel Akwa Palace');
   });
 
-  it('CsvExporter écrit un en-tête + lignes avec séparateur ;', async () => {
+  it('CsvExporter writes a header + rows with the ; separator', async () => {
     dir ||= await mkdtemp(join(tmpdir(), 'scraper-'));
     const path = join(dir, 'out.csv');
     const exp = createExporter('csv', path);
@@ -59,12 +59,12 @@ describe('exporters', () => {
     await exp.close();
 
     const content = await readFile(path, 'utf-8');
-    expect(content).toContain("Nom de l'établissement;");
+    expect(content).toContain('Establishment name;');
     expect(content).toContain('Hôtel Akwa Palace;');
     expect(content.trim().split('\n')).toHaveLength(3);
   });
 
-  it('ExcelExporter produit 2 onglets avec les bonnes lignes', async () => {
+  it('ExcelExporter produces 2 tabs with the right rows', async () => {
     dir ||= await mkdtemp(join(tmpdir(), 'scraper-'));
     const path = join(dir, 'out.xlsx');
     const exp = createExporter('excel', path);
@@ -74,8 +74,8 @@ describe('exporters', () => {
 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(path);
-    const etab = wb.getWorksheet('Établissements');
-    const dec = wb.getWorksheet('Décideurs');
+    const etab = wb.getWorksheet('Establishments');
+    const dec = wb.getWorksheet('Contacts');
     expect(etab?.actualRowCount).toBe(3); // header + 2
     expect(dec?.actualRowCount).toBe(2); // header + 1 contact
   });

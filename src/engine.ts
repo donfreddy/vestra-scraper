@@ -31,10 +31,10 @@ export interface RunOptions {
   source?: SourceName;
   limit?: number;
   country?: string;
-  /** Chemin du fichier de sortie. Le format est déduit de l'extension. */
+  /** Output file path. The format is inferred from the extension. */
   output: string;
   format?: ExportFormat;
-  /** Liste d'enrichers : `"website,email"`, `"all"`, ou vide pour aucun. */
+  /** Enricher list: `"website,email"`, `"all"`, or empty for none. */
   enrich?: string;
   signal?: AbortSignal;
 }
@@ -54,8 +54,8 @@ export interface RunResult {
 }
 
 /**
- * Orchestrateur : scraping (Strategy) -> pipeline (validation / normalisation /
- * dédup) -> enrichissement optionnel -> export.
+ * Orchestrator: scraping (Strategy) -> pipeline (validation / normalization /
+ * dedup) -> optional enrichment -> export.
  */
 export class ScraperEngine {
   private readonly config: AppConfig;
@@ -73,7 +73,7 @@ export class ScraperEngine {
         return new GoogleMapsScraper({ browser });
       default: {
         const exhaustive: never = source;
-        throw new Error(`Source inconnue: ${String(exhaustive)}`);
+        throw new Error(`Unknown source: ${String(exhaustive)}`);
       }
     }
   }
@@ -127,7 +127,7 @@ export class ScraperEngine {
       for await (const lead of pipeline.run(source)) {
         leads.push(lead);
         if (streaming) await exporter.write(lead);
-        this.logger.info(`✓ ${lead.companyName}${lead.city ? ` — ${lead.city}` : ''}`);
+        this.logger.info(`✓ ${lead.companyName}${lead.city ? ` in ${lead.city}` : ''}`);
       }
 
       let enrichment: EnrichmentSummary | undefined;
@@ -146,7 +146,7 @@ export class ScraperEngine {
         durationMs: Date.now() - started,
       };
     } finally {
-      await browser.close().catch((e) => this.logger.warn('fermeture navigateur:', e as Error));
+      await browser.close().catch((e) => this.logger.warn('closing browser:', e as Error));
     }
   }
 
@@ -157,7 +157,7 @@ export class ScraperEngine {
     signal: AbortSignal | undefined,
   ): Promise<EnrichmentSummary> {
     const log = this.logger.child('enrich');
-    log.info(`enrichissement (${names.join(', ')}) sur ${leads.length} leads`);
+    log.info(`enrichment (${names.join(', ')}) on ${leads.length} leads`);
 
     const enrichers: IEnricher[] = names.map((n) =>
       createEnricher(n, {
@@ -192,7 +192,7 @@ export class ScraperEngine {
             touched = true;
           }
         } catch (error) {
-          log.warn(`${enricher.name} a échoué sur "${current.companyName}": ${(error as Error).message}`);
+          log.warn(`${enricher.name} failed on "${current.companyName}": ${(error as Error).message}`);
         }
       }
       leads[index] = current;
@@ -201,13 +201,13 @@ export class ScraperEngine {
 
     detectChains(leads);
     const chainsDetected = leads.filter((l) => l.chain?.isChain).length;
-    log.info(`${enriched} leads enrichis · ${chainsDetected} rattachés à une chaîne`);
+    log.info(`${enriched} leads enriched · ${chainsDetected} attached to a chain`);
 
     return { enrichers: names, leadsEnriched: enriched, chainsDetected };
   }
 }
 
-/** Applique `worker` sur `items` avec au plus `concurrency` tâches simultanées. */
+/** Applies `worker` to `items` with at most `concurrency` simultaneous tasks. */
 async function mapPool<T>(
   items: T[],
   concurrency: number,

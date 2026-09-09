@@ -21,15 +21,15 @@ const REVIEWS_EXTRACTION_JS = `(() => {
 })()`;
 
 export interface ReviewsEnricherOptions {
-  /** Nombre max d'avis récupérés (défaut 25). */
+  /** Max number of reviews fetched (default 25). */
   maxReviews?: number;
 }
 
 /**
- * Récupère les avis Google Maps d'une fiche et en tire un résumé + sentiment.
- * Requiert un `BrowserDriver` (Playwright) et un `sourceUrl` Google Maps.
- * Le résumé LLM est produit si `anthropicApiKey` est fourni, sinon on remonte
- * les extraits les plus parlants.
+ * Fetches the Google Maps reviews of a place and derives a summary + sentiment.
+ * Requires a `BrowserDriver` (Playwright) and a Google Maps `sourceUrl`.
+ * The LLM summary is produced when `anthropicApiKey` is provided, otherwise
+ * the most telling excerpts are returned.
  */
 export class ReviewsEnricher implements IEnricher {
   readonly name = 'reviews';
@@ -45,7 +45,7 @@ export class ReviewsEnricher implements IEnricher {
 
   async enrich(lead: B2BLead, ctx: EnrichContext): Promise<LeadPatch> {
     if (!ctx.browser) {
-      ctx.logger.child(this.name).warn('BrowserDriver requis — enricher ignoré');
+      ctx.logger.child(this.name).warn('BrowserDriver required: enricher ignored');
       return {};
     }
     const log = ctx.logger.child(this.name);
@@ -75,14 +75,14 @@ export class ReviewsEnricher implements IEnricher {
       insight.sentiment = summarized.sentiment;
       insight.highlights = summarized.highlights;
     } catch (error) {
-      log.warn(`résumé indisponible: ${(error as Error).message}`);
+      log.warn(`summary unavailable: ${(error as Error).message}`);
       insight.highlights = raw
         .filter((r) => r.text.length > 40)
         .slice(0, 3)
         .map((r) => truncate(r.text, 200));
     }
 
-    log.debug(`${lead.companyName}: ${raw.length} avis analysés (${insight.sentiment ?? 'n/a'})`);
+    log.debug(`${lead.companyName}: ${raw.length} reviews analyzed (${insight.sentiment ?? 'n/a'})`);
     return { reviews: insight };
   }
 

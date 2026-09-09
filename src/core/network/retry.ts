@@ -1,12 +1,12 @@
 import pRetry, { AbortError } from 'p-retry';
 
-/** Codes HTTP considérés comme temporaires (blocage / surcharge). */
+/** HTTP status codes considered temporary (blocked / overloaded). */
 export const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export interface RetryOptions {
   retries: number;
   baseDelayMs: number;
-  /** Multiplicateur exponentiel (défaut 2). */
+  /** Exponential multiplier (default 2). */
   factor?: number;
   onRetry?: (error: Error, attempt: number) => void;
 }
@@ -25,8 +25,8 @@ export function isRetryableError(error: unknown): boolean {
 }
 
 /**
- * Exécute `fn` avec backoff exponentiel + jitter. Les erreurs jugées
- * définitives (4xx hors liste) interrompent immédiatement les tentatives.
+ * Runs `fn` with exponential backoff + jitter. Errors judged
+ * permanent (4xx outside the list) stop the attempts immediately.
  */
 export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
   const factor = options.factor ?? 2;

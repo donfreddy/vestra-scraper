@@ -1,7 +1,7 @@
 import type { B2BLead } from '../core/types/lead.entity.js';
 import { cityKey } from '../core/pipeline/city-normalizer.js';
 
-/** Enseignes multi-sites connues (hôtellerie Afrique centrale + internationales). */
+/** Known multi-site brands (Central African hospitality + international). */
 export const KNOWN_CHAINS: Array<{ name: string; re: RegExp }> = [
   { name: 'Hilton', re: /\bhilton\b/i },
   { name: 'Ibis / Accor', re: /\b(ibis|novotel|mercure|pullman|sofitel|accor)\b/i },
@@ -27,10 +27,10 @@ function brandKey(name: string): string {
 }
 
 /**
- * Marque chaque lead comme appartenant (ou non) à une chaîne :
- *  - correspondance avec une enseigne connue, ou
- *  - même marque présente dans ≥ 2 villes distinctes du jeu de données.
- * Mutation en place de `lead.chain`.
+ * Marks each lead as belonging (or not) to a chain:
+ *  - match with a known brand, or
+ *  - same brand present in >= 2 distinct cities of the dataset.
+ * Mutates `lead.chain` in place.
  */
 export function detectChains(leads: B2BLead[]): void {
   const citiesByBrand = new Map<string, Set<string>>();

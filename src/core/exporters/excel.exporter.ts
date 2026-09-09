@@ -6,21 +6,21 @@ import type { ExporterResult, ILeadExporter } from '../types/exporter.interface.
 import { LEAD_COLUMNS, flattenLead } from './flatten.js';
 
 const CONTACT_COLUMNS = [
-  ['companyName', 'Entreprise'],
-  ['city', 'Ville'],
-  ['fullName', 'Nom du décideur'],
-  ['role', 'Rôle'],
-  ['titleRaw', 'Intitulé exact'],
-  ['emailDirect', 'Email direct'],
-  ['phoneDirect', 'Téléphone direct'],
+  ['companyName', 'Company'],
+  ['city', 'City'],
+  ['fullName', 'Contact name'],
+  ['role', 'Role'],
+  ['titleRaw', 'Exact title'],
+  ['emailDirect', 'Direct email'],
+  ['phoneDirect', 'Direct phone'],
   ['linkedinUrl', 'LinkedIn'],
-  ['confidence', 'Confiance'],
-  ['leadId', 'ID entreprise'],
+  ['confidence', 'Confidence'],
+  ['leadId', 'Company ID'],
 ] as const;
 
 /**
- * Export Excel en streaming : un onglet "Établissements" (une ligne / lead) et
- * un onglet "Décideurs" (une ligne / contact).
+ * Streaming Excel export: an "Establishments" tab (one row per lead) and
+ * a "Contacts" tab (one row per contact).
  */
 export class ExcelExporter implements ILeadExporter {
   readonly name = 'excel';
@@ -42,13 +42,13 @@ export class ExcelExporter implements ILeadExporter {
       useSharedStrings: true,
     });
 
-    this.leadSheet = this.workbook.addWorksheet('Établissements', {
+    this.leadSheet = this.workbook.addWorksheet('Establishments', {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
     this.leadSheet.columns = LEAD_COLUMNS.map(([key, header]) => ({ key, header, width: 24 }));
     this.leadSheet.getRow(1).font = { bold: true };
 
-    this.contactSheet = this.workbook.addWorksheet('Décideurs', {
+    this.contactSheet = this.workbook.addWorksheet('Contacts', {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
     this.contactSheet.columns = CONTACT_COLUMNS.map(([key, header]) => ({ key, header, width: 24 }));
@@ -56,7 +56,7 @@ export class ExcelExporter implements ILeadExporter {
   }
 
   async write(lead: B2BLead): Promise<void> {
-    if (!this.leadSheet || !this.contactSheet) throw new Error('ExcelExporter: open() non appelé');
+    if (!this.leadSheet || !this.contactSheet) throw new Error('ExcelExporter: open() not called');
     this.leadSheet.addRow(flattenLead(lead)).commit();
     for (const c of lead.contacts) {
       this.contactSheet
@@ -79,7 +79,7 @@ export class ExcelExporter implements ILeadExporter {
 
   async close(): Promise<ExporterResult> {
     if (!this.workbook || !this.leadSheet || !this.contactSheet) {
-      throw new Error('ExcelExporter: open() non appelé');
+      throw new Error('ExcelExporter: open() not called');
     }
     this.leadSheet.commit();
     this.contactSheet.commit();

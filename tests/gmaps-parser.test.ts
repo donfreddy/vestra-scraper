@@ -8,24 +8,24 @@ import {
 } from '../src/scrapers/google-maps/gmaps.parser.js';
 
 describe('gmaps.parser', () => {
-  it('parseRating gère la virgule décimale', () => {
+  it('parseRating handles the decimal comma', () => {
     expect(parseRating('4,3')).toBe(4.3);
     expect(parseRating('4.0 stars')).toBe(4);
     expect(parseRating('sans note')).toBeUndefined();
   });
 
-  it('parseReviews extrait les chiffres', () => {
+  it('parseReviews extracts the digits', () => {
     expect(parseReviews('(1 234)')).toBe(1234);
     expect(parseReviews('1,234 avis')).toBe(1234);
     expect(parseReviews('')).toBeUndefined();
   });
 
-  it('extractCityFromAddress ignore le pays et le code postal', () => {
+  it('extractCityFromAddress ignores the country and postal code', () => {
     expect(extractCityFromAddress('123 Rue de la Joie, Akwa, Douala, Cameroun')).toBe('Douala');
     expect(extractCityFromAddress('BP 1234, Yaoundé, Cameroun')).toBe('Yaoundé');
   });
 
-  it('parseLatLngFromUrl lit les coordonnées', () => {
+  it('parseLatLngFromUrl reads the coordinates', () => {
     const { latitude, longitude } = parseLatLngFromUrl(
       'https://www.google.com/maps/place/Hotel/@4.0511,9.7679,17z/data=!3d4.0511!4d9.7679',
     );
@@ -33,7 +33,7 @@ describe('gmaps.parser', () => {
     expect(longitude).toBeCloseTo(9.7679);
   });
 
-  it('toRawLead construit un RawLead google-maps', () => {
+  it('toRawLead builds a google-maps RawLead', () => {
     const raw = toRawLead(
       {
         name: '  Hôtel Test  ',

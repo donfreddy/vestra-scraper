@@ -19,9 +19,9 @@ export interface HttpDriverOptions {
 }
 
 /**
- * Couche transport HTTP. Encapsule rate-limiting, rotation de proxies et retry
- * exponentiel : les scrapers appellent `getText` / `getJson` / `getDom` sans
- * se soucier de ces contraintes réseau.
+ * HTTP transport layer. Encapsulates rate-limiting, proxy rotation and
+ * exponential retry: scrapers call `getText` / `getJson` / `getDom` without
+ * worrying about these network constraints.
  */
 export class HttpDriver {
   private readonly proxyManager: ProxyManager;
@@ -43,7 +43,7 @@ export class HttpDriver {
     };
     this.client = got.extend({
       timeout: { request: options.timeoutMs ?? 15_000 },
-      retry: { limit: 0 }, // le retry est géré par `withRetry`
+      retry: { limit: 0 }, // retry is handled by `withRetry`
       headers: {
         'user-agent': options.userAgent ?? DEFAULT_UA,
         accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -78,7 +78,7 @@ export class HttpDriver {
           onRetry: (err, attempt) => {
             const status = (err as { response?: { statusCode?: number } }).response?.statusCode;
             this.log.warn(
-              `blocage/erreur (${status ?? (err as { code?: string }).code ?? 'inconnu'}) sur ${url} — tentative ${attempt}/${this.retryOpts.retries}`,
+              `blocked/error (${status ?? (err as { code?: string }).code ?? 'unknown'}) on ${url}, attempt ${attempt}/${this.retryOpts.retries}`,
             );
           },
         },

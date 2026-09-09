@@ -29,12 +29,12 @@ export function createEnricher(name: EnricherName, options: EnricherFactoryOptio
       return new ReviewsEnricher();
     default: {
       const exhaustive: never = name;
-      throw new Error(`Enricher inconnu: ${String(exhaustive)}`);
+      throw new Error(`Unknown enricher: ${String(exhaustive)}`);
     }
   }
 }
 
-/** Parse `"website,email"` / `"all"` en liste d'enrichers valides (ordre stable). */
+/** Parses `"website,email"` / `"all"` into a list of valid enrichers (stable order). */
 export function parseEnricherList(spec: string | undefined): EnricherName[] {
   if (!spec) return [];
   const raw = spec.trim().toLowerCase();

@@ -12,13 +12,13 @@ const LEVEL_WEIGHT: Record<LogLevel, number> = {
 
 export interface LoggerOptions {
   level?: LogLevel;
-  /** Préfixe affiché entre crochets, ex: le nom du scraper. */
+  /** Prefix displayed inside brackets, e.g. the scraper name. */
   scope?: string;
 }
 
 /**
- * Logger minimal sans dépendance lourde. Écrit sur stderr pour ne pas polluer
- * un éventuel export JSON envoyé sur stdout.
+ * Minimal logger with no heavy dependency. Writes to stderr to avoid polluting
+ * a possible JSON export sent to stdout.
  */
 export class Logger {
   private readonly level: LogLevel;

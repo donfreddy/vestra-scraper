@@ -4,7 +4,7 @@ import { inferRole } from '../core/pipeline/pipeline.js';
 
 const EMAIL_RE = /[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi;
 
-/** Extensions de fichiers/faux positifs fréquents dans les "e-mails" scannés. */
+/** Frequent file extensions / false positives in the scanned "emails". */
 const EMAIL_BLOCKLIST = [
   /\.(png|jpe?g|gif|svg|webp|css|js|ico)$/i,
   /@(sentry|wix|wixpress|example|domain|email|sentry\.io|2x|3x)\b/i,
@@ -23,7 +23,7 @@ export function extractEmails(html: string): string[] {
   return [...found];
 }
 
-/** Numéros repérés dans le texte + attributs `tel:`, normalisés E.164. */
+/** Numbers spotted in the text + `tel:` attributes, normalized to E.164. */
 export function extractPhones(candidates: Iterable<string>, country: string): string[] {
   const out = new Set<string>();
   for (const cand of candidates) {
@@ -84,7 +84,7 @@ export interface ExtractedContact {
   confidence: number;
 }
 
-/** Repère des couples "Nom — Titre" dans le texte visible d'une page. Heuristique. */
+/** Spots "Name / Title" pairs in a page's visible text. Heuristic. */
 export function extractContacts(text: string): ExtractedContact[] {
   const flat = text.replace(/\s+/g, ' ');
   const seen = new Map<string, ExtractedContact>();

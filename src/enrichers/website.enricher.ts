@@ -4,7 +4,7 @@ import type { EnrichContext, IEnricher, LeadPatch } from '../core/types/enricher
 import { leadContactSchema } from '../core/types/lead.entity.js';
 import { extractContacts, extractEmails, extractLegalName, extractPhones, extractSocials } from './extract.js';
 
-/** Chemins courants où trouver des coordonnées / une équipe. */
+/** Common paths where contact info / a team can be found. */
 const CANDIDATE_PATHS = [
   '',
   '/contact',
@@ -22,14 +22,13 @@ const CANDIDATE_PATHS = [
 ];
 
 export interface WebsiteEnricherOptions {
-  /** Nombre max de pages visitées par site (défaut 4). */
+  /** Max number of pages visited per site (default 4). */
   maxPages?: number;
 }
 
 /**
- * Enrichit un lead à partir de son site web : e-mails, téléphones additionnels,
- * réseaux sociaux, raison sociale et — de façon heuristique — des contacts
- * nominatifs (« Nom — Directeur »).
+ * Enriches a lead from its website: emails, additional phones, social
+ * networks, legal name and, heuristically, named contacts ("Name / Director").
  */
 export class WebsiteEnricher implements IEnricher {
   readonly name = 'website';
@@ -62,7 +61,7 @@ export class WebsiteEnricher implements IEnricher {
       try {
         $ = await ctx.http.getDom(url);
       } catch (error) {
-        if (path === '') log.debug(`site injoignable: ${(error as Error).message}`);
+        if (path === '') log.debug(`site unreachable: ${(error as Error).message}`);
         continue;
       }
       visited += 1;
@@ -106,7 +105,7 @@ export class WebsiteEnricher implements IEnricher {
       }
     }
 
-    // Rattache un e-mail nominatif probable à chaque contact (prenom@ / p.nom@).
+    // Attach a probable personal email to each contact (firstname@ / f.lastname@).
     const mergedContacts = mergeContacts(lead.contacts, [...contacts.values()], [...emails]);
 
     const primaryEmail =
@@ -124,7 +123,7 @@ export class WebsiteEnricher implements IEnricher {
     if (legalName) patch.legalName = legalName;
 
     log.debug(
-      `${lead.companyName}: ${emails.size} e-mail(s), ${phones.size} tél, ${mergedContacts.length} contact(s)`,
+      `${lead.companyName}: ${emails.size} email(s), ${phones.size} phone(s), ${mergedContacts.length} contact(s)`,
     );
     return patch;
   }
@@ -133,7 +132,7 @@ export class WebsiteEnricher implements IEnricher {
 function isRelevantEmail(email: string, hostname: string): boolean {
   const domain = email.split('@')[1] ?? '';
   const root = hostname.replace(/^www\./, '');
-  // même domaine, ou fournisseur générique (petites structures)
+  // same domain, or generic provider (small businesses)
   return domain === root || /(gmail|yahoo|hotmail|outlook|icloud)\.[a-z]+$/.test(domain);
 }
 

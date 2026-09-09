@@ -1,6 +1,6 @@
 import type { RawLead } from '../../core/types/lead.entity.js';
 
-/** Données brutes (chaînes issues du DOM) extraites d'une fiche Google Maps. */
+/** Raw data (strings from the DOM) extracted from a Google Maps place. */
 export interface GmapsPlaceRaw {
   name: string;
   placeUrl?: string;
@@ -25,7 +25,7 @@ export function parseRating(text: string | undefined): number | undefined {
   return value >= 0 && value <= 5 ? value : undefined;
 }
 
-/** "(1 234)" | "1,234 avis" | "1 234" -> 1234 */
+/** "(1 234)" | "1,234 reviews" | "1 234" -> 1234 */
 export function parseReviews(text: string | undefined): number | undefined {
   if (!text) return undefined;
   const digits = text.replace(/[^\d]/g, '');
@@ -35,8 +35,8 @@ export function parseReviews(text: string | undefined): number | undefined {
 }
 
 /**
- * Devine la ville à partir d'une adresse Google Maps.
- * Heuristique : dernier segment hors "pays", en retirant un éventuel code postal.
+ * Guesses the city from a Google Maps address.
+ * Heuristic: last segment outside the country, removing a possible postal code.
  */
 export function extractCityFromAddress(address: string | undefined): string | undefined {
   if (!address) return undefined;
@@ -55,7 +55,7 @@ export function extractCityFromAddress(address: string | undefined): string | un
   return undefined;
 }
 
-/** `/maps/place/...!3d<lat>!4d<lng>` -> coordonnées. */
+/** `/maps/place/...!3d<lat>!4d<lng>` -> coordinates. */
 export function parseLatLngFromUrl(url: string | undefined): { latitude?: number; longitude?: number } {
   if (!url) return {};
   const m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ?? url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
@@ -64,7 +64,7 @@ export function parseLatLngFromUrl(url: string | undefined): { latitude?: number
 }
 
 export interface ParseOptions {
-  /** Ville de repli (celle de la requête) si l'adresse ne permet pas de la déduire. */
+  /** Fallback city (from the query) if the address does not allow deducing it. */
   fallbackCity?: string;
   country?: string;
 }

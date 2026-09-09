@@ -21,24 +21,24 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 
 /**
- * Résume un lot d'avis via l'API Anthropic (Messages). Lève si aucune clé n'est
- * disponible : l'appelant retombe alors sur des extraits bruts.
+ * Summarizes a batch of reviews via the Anthropic API (Messages). Throws if no
+ * key is available: the caller then falls back to raw excerpts.
  */
 export async function summarizeReviews(reviews: RawReview[], options: SummarizeOptions): Promise<ReviewSummary> {
   const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY absente');
-  if (reviews.length === 0) throw new Error('aucun avis');
+  if (!apiKey) throw new Error('missing ANTHROPIC_API_KEY');
+  if (reviews.length === 0) throw new Error('no reviews');
 
   const corpus = reviews
     .map((r, i) => `[${i + 1}] (${r.ratingLabel || '?'}) ${r.text.replace(/\s+/g, ' ').slice(0, 500)}`)
     .join('\n');
 
   const prompt =
-    `Voici des avis clients Google Maps concernant "${options.companyName}".\n\n${corpus}\n\n` +
-    `Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, de la forme :\n` +
-    `{"summary": "<2-3 phrases en français, factuel>", "sentiment": "positive|mixed|negative", ` +
-    `"highlights": ["<point saillant>", "..."]}\n` +
-    `"highlights" : 3 à 5 éléments courts (points forts et points faibles récurrents).`;
+    `Here are Google Maps customer reviews for "${options.companyName}".\n\n${corpus}\n\n` +
+    `Answer ONLY with a valid JSON object, with no surrounding text, in the form:\n` +
+    `{"summary": "<2-3 factual sentences in English>", "sentiment": "positive|mixed|negative", ` +
+    `"highlights": ["<notable point>", "..."]}\n` +
+    `"highlights": 3 to 5 short items (recurring strengths and weaknesses).`;
 
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
@@ -66,7 +66,7 @@ export async function summarizeReviews(reviews: RawReview[], options: SummarizeO
 
 export function parseSummary(text: string): ReviewSummary {
   const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('réponse LLM non parsable');
+  if (!match) throw new Error('unparseable LLM response');
   const parsed = JSON.parse(match[0]) as Partial<ReviewSummary>;
 
   const sentiment =

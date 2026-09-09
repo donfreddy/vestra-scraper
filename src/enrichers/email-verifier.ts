@@ -14,9 +14,9 @@ const DISPOSABLE = new Set([
 ]);
 
 export interface EmailVerifierOptions {
-  /** Sonde SMTP (RCPT TO). Désactiver si le port 25 sortant est bloqué. */
+  /** SMTP probe (RCPT TO). Disable if outbound port 25 is blocked. */
   smtpProbe?: boolean;
-  /** Adresse utilisée en `MAIL FROM`. */
+  /** Address used as `MAIL FROM`. */
   fromAddress?: string;
   timeoutMs?: number;
 }
@@ -28,9 +28,9 @@ interface DomainCheck {
 }
 
 /**
- * Valide les e-mails : syntaxe -> domaine jetable -> enregistrements MX ->
- * (optionnel) handshake SMTP `RCPT TO` + détection catch-all.
- * Dégrade en `unknown` si le réseau bloque la sonde SMTP.
+ * Validates emails: syntax -> disposable domain -> MX records ->
+ * (optional) SMTP `RCPT TO` handshake + catch-all detection.
+ * Degrades to `unknown` if the network blocks the SMTP probe.
  */
 export class EmailVerifier implements IEnricher {
   readonly name = 'email';
@@ -126,7 +126,7 @@ export class EmailVerifier implements IEnricher {
     return cached;
   }
 
-  /** Ouvre une session SMTP minimale et renvoie l'acceptation du `RCPT TO`. */
+  /** Opens a minimal SMTP session and returns the `RCPT TO` acceptance. */
   private smtpRcpt(mxHost: string, rcpt: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const socket = net.createConnection(25, mxHost);

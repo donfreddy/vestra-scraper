@@ -25,8 +25,8 @@ function mergeContactList(current: LeadContact[], incoming: LeadContact[] | unde
 }
 
 /**
- * Fusionne un `LeadPatch` d'enricher dans un lead. Non destructif : les valeurs
- * déjà présentes ne sont pas écrasées par du vide.
+ * Merges an enricher `LeadPatch` into a lead. Non-destructive: values already
+ * present are not overwritten by empty ones.
  */
 export function applyPatch(lead: B2BLead, patch: LeadPatch, enricherName: string): B2BLead {
   const next: B2BLead = { ...lead };

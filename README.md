@@ -1,95 +1,95 @@
 # Vestra
 
-**Vestra** — module interne d'extraction et d'enrichissement de **leads B2B** (Google Maps,
-annuaires) en **Node.js / TypeScript**, sans dépendre d'une API tierce payante. Conçu pour
-être réutilisé dans d'autres projets (SDK) ou lancé en ligne de commande (CLI `vestra`).
+**Vestra** is an internal module for extracting and enriching **B2B leads** (Google Maps,
+directories) in **Node.js / TypeScript**, without depending on a paid third-party API. Designed to
+be reused in other projects (SDK) or run from the command line (`vestra` CLI).
 
-Issu du cadrage décrit dans [`gemini.md`](./gemini.md). Périmètre actuel :
+Derived from the scoping described in [`gemini.md`](./gemini.md). Current scope:
 
-- **Collecte** : scraper Google Maps (Playwright) + pipeline (validation, téléphone E.164,
-  villes, dédoublonnage) + exporters JSON / CSV / Excel + CLI.
-- **Enrichissement** (option `--enrich`) : site web (e-mails, téléphones, réseaux sociaux,
-  raison sociale, contacts décideurs), vérification d'e-mail (MX + SMTP), avis Google
-  (résumé + sentiment via l'API Claude), détection de chaîne.
+- **Collection**: Google Maps scraper (Playwright) + pipeline (validation, E.164 phone,
+  cities, deduplication) + JSON / CSV / Excel exporters + CLI.
+- **Enrichment** (`--enrich` option): website (emails, phones, social networks,
+  legal name, decision-maker contacts), email verification (MX + SMTP), Google reviews
+  (summary + sentiment via the Claude API), chain detection.
 
-Pas encore fait (interfaces prêtes) : captcha-solving, persistance PostgreSQL/Prisma,
-firmographie (CA / effectif), trafic web.
+Not yet done (interfaces ready): captcha solving, PostgreSQL/Prisma persistence,
+firmographics (revenue / headcount), web traffic.
 
 ## Installation
 
 ```bash
 corepack enable
 yarn install
-yarn playwright install chromium   # navigateur headless (lancé aussi en postinstall)
-cp .env.example .env               # ajuster si besoin
+yarn playwright install chromium   # headless browser (also run in postinstall)
+cp .env.example .env               # adjust if needed
 ```
 
-Node ≥ 20 requis.
+Node >= 20 required.
 
-## Utilisation — CLI
+## Usage (CLI)
 
 ```bash
-# Développement (TypeScript direct)
-yarn cli extract -q "Hôtel" -l "Douala, Cameroun" -o ./out/hotels_douala.xlsx
+# Development (direct TypeScript)
+yarn cli extract -q "Hotel" -l "Douala, Cameroon" -o ./out/hotels_douala.xlsx
 
-# Après build / lien global
+# After build / global link
 yarn build && npm link
-vestra extract -q "Hôtel" -l "Kribi, Cameroun" -n 50 -f csv -o ./out/kribi.csv
+vestra extract -q "Hotel" -l "Kribi, Cameroon" -n 50 -f csv -o ./out/kribi.csv
 ```
 
-| Option | Description | Défaut |
+| Option | Description | Default |
 | --- | --- | --- |
-| `-q, --query` | Terme métier (`"Hôtel"`, `"Clinique"`…) | *requis* |
-| `-l, --location` | Zone cible (`"Douala, Cameroun"`) | *requis* |
+| `-q, --query` | Business term (`"Hotel"`, `"Clinic"`...) | *required* |
+| `-l, --location` | Target area (`"Douala, Cameroon"`) | *required* |
 | `-s, --source` | `gmaps` \| `google-maps` | `gmaps` |
-| `-o, --output` | Fichier de sortie — le format vient de l'extension | `./out/leads.xlsx` |
-| `-f, --format` | Force `excel` \| `csv` \| `json` | *(déduit)* |
-| `-c, --country` | Pays ISO-2 pour normaliser les téléphones | `CM` |
-| `-n, --limit` | Nombre max de fiches (`0` = illimité) | `0` |
-| `-e, --enrich` | `website`, `email`, `reviews` (virgule) ou `all` | *(aucun)* |
+| `-o, --output` | Output file, format comes from the extension | `./out/leads.xlsx` |
+| `-f, --format` | Force `excel` \| `csv` \| `json` | *(inferred)* |
+| `-c, --country` | ISO-2 country for phone normalization | `CM` |
+| `-n, --limit` | Max number of records (`0` = unlimited) | `0` |
+| `-e, --enrich` | `website`, `email`, `reviews` (comma-separated) or `all` | *(none)* |
 | `--log-level` | `debug` \| `info` \| `warn` \| `error` \| `silent` | `info` |
 
-> Google plafonne une recherche à ~120 résultats par zone. Pour couvrir une grande
-> ville, lancer plusieurs requêtes ciblées (quartiers, communes) vers le même fichier :
-> le pipeline dédoublonne automatiquement.
+> Google caps a search at ~120 results per area. To cover a large city, run several
+> targeted queries (neighborhoods, districts) against the same output file: the
+> pipeline deduplicates automatically.
 
-### Enrichissement
+### Enrichment
 
 ```bash
-vestra extract -q "Hôtel" -l "Douala, Cameroun" --enrich website,email -o ./out/douala.xlsx
-vestra extract -q "Hôtel" -l "Kribi, Cameroun"  --enrich all           -o ./out/kribi.xlsx
+vestra extract -q "Hotel" -l "Douala, Cameroon" --enrich website,email -o ./out/douala.xlsx
+vestra extract -q "Hotel" -l "Kribi, Cameroon"  --enrich all           -o ./out/kribi.xlsx
 ```
 
-| Enricher | Source | Ajoute | Dépendance |
+| Enricher | Source | Adds | Dependency |
 | --- | --- | --- | --- |
-| `website` | site web du lead (HTTP) | `emails`, `phones`, `socials` (LinkedIn/FB/IG/WhatsApp), `legalName`, `contacts` décideurs (heuristique) | — |
-| `email` | MX + handshake SMTP | `emailStatus` (`valid`/`invalid`/`risky`/`unknown`), `emailCatchAll` | port 25 sortant ouvert (sinon `unknown`) |
-| `reviews` | avis Google Maps (Playwright) | `reviews.summary`, `reviews.sentiment`, `reviews.highlights` | `ANTHROPIC_API_KEY` (sinon extraits bruts) |
+| `website` | lead website (HTTP) | `emails`, `phones`, `socials` (LinkedIn/FB/IG/WhatsApp), `legalName`, decision-maker `contacts` (heuristic) | none |
+| `email` | MX + SMTP handshake | `emailStatus` (`valid`/`invalid`/`risky`/`unknown`), `emailCatchAll` | outbound port 25 open (otherwise `unknown`) |
+| `reviews` | Google Maps reviews (Playwright) | `reviews.summary`, `reviews.sentiment`, `reviews.highlights` | `ANTHROPIC_API_KEY` (otherwise raw excerpts) |
 
-La détection de **chaîne** (`chain.isChain` / `chain.name`) tourne automatiquement dès
-qu'un enricher est actif : enseignes connues + même marque repérée dans ≥ 2 villes.
+**Chain** detection (`chain.isChain` / `chain.name`) runs automatically as soon as an
+enricher is active: known brands plus the same brand spotted in >= 2 cities.
 
-> Avec `--enrich`, les résultats sont d'abord tous collectés puis enrichis (pas de
-> streaming) : prévois plus de temps sur les gros volumes.
+> With `--enrich`, results are first all collected then enriched (no streaming):
+> plan extra time on large volumes.
 
-## Utilisation — SDK
+## Usage (SDK)
 
 ```ts
 import { ScraperEngine } from 'vestra';
 
 const engine = new ScraperEngine({ logLevel: 'info' });
 const { leads, stats, export: out } = await engine.run({
-  query: 'Hôtel',
-  location: 'Douala, Cameroun',
+  query: 'Hotel',
+  location: 'Douala, Cameroon',
   output: './out/douala.xlsx',
   limit: 100,
-  enrich: 'website,email', // optionnel
+  enrich: 'website,email', // optional
 });
 
-console.log(`${stats.accepted} leads → ${out.location}`);
+console.log(`${stats.accepted} leads -> ${out.location}`);
 ```
 
-Les briques sont aussi exportées individuellement : `normalizePhone`, `normalizeCity`,
+The building blocks are also exported individually: `normalizePhone`, `normalizeCity`,
 `Deduplicator`, `LeadPipeline`, `HttpDriver`, `BrowserDriver`, `createExporter`, etc.
 
 ## Architecture
@@ -97,89 +97,90 @@ Les briques sont aussi exportées individuellement : `normalizePhone`, `normaliz
 ```text
 src/
 ├── core/
-│   ├── config.ts              # .env → AppConfig (validé par zod)
-│   ├── logger.ts              # logger minimal (stderr)
-│   ├── types/                 # B2BLead, IScraper, ILeadExporter (contrats)
+│   ├── config.ts              # .env -> AppConfig (validated with zod)
+│   ├── logger.ts              # minimal logger (stderr)
+│   ├── types/                 # B2BLead, IScraper, ILeadExporter (contracts)
 │   ├── driver/
-│   │   ├── http.driver.ts     # got + rate-limit + proxies + retry (annuaires HTML)
-│   │   └── browser.driver.ts  # Playwright/Chromium + proxies + concurrence
+│   │   ├── http.driver.ts     # got + rate-limit + proxies + retry (HTML directories)
+│   │   └── browser.driver.ts  # Playwright/Chromium + proxies + concurrency
 │   ├── network/
-│   │   ├── proxy-manager.ts   # rotation Round-Robin
-│   │   ├── rate-limiter.ts    # fenêtre glissante (p-queue)
-│   │   └── retry.ts           # backoff exponentiel + jitter (p-retry)
+│   │   ├── proxy-manager.ts   # Round-Robin rotation
+│   │   ├── rate-limiter.ts    # sliding window (p-queue)
+│   │   └── retry.ts           # exponential backoff + jitter (p-retry)
 │   ├── pipeline/
 │   │   ├── phone-normalizer.ts # E.164 via libphonenumber-js
-│   │   ├── city-normalizer.ts  # "Dla"/"DOUALA" → "Douala"
-│   │   ├── deduplicator.ts     # nom+ville, téléphone, domaine web
-│   │   └── pipeline.ts         # valide → normalise → dédoublonne (streaming)
-│   ├── pipeline/merge.ts       # applyPatch : fusion des patchs d'enrichers
-│   └── exporters/             # JSON / CSV (;+BOM) / Excel (2 onglets), en streaming
+│   │   ├── city-normalizer.ts  # "Dla"/"DOUALA" -> "Douala"
+│   │   ├── deduplicator.ts     # name+city, phone, website domain
+│   │   └── pipeline.ts         # validate -> normalize -> deduplicate (streaming)
+│   ├── pipeline/merge.ts       # applyPatch: merges enricher patches
+│   └── exporters/             # JSON / CSV (;+BOM) / Excel (2 tabs), streaming
 ├── scrapers/
 │   └── google-maps/
-│       ├── gmaps.scraper.ts   # stratégie Playwright (scroll + fiches)
-│       └── gmaps.parser.ts    # DOM brut → RawLead (pur, testé)
+│       ├── gmaps.scraper.ts   # Playwright strategy (scroll + place sheets)
+│       └── gmaps.parser.ts    # raw DOM -> RawLead (pure, tested)
 ├── enrichers/
-│   ├── website.enricher.ts   # e-mails, tél, socials, raison sociale, contacts
-│   ├── email-verifier.ts     # MX + handshake SMTP + catch-all
-│   ├── reviews.enricher.ts   # avis GMaps → résumé/sentiment (API Claude)
-│   ├── review-summary.ts     # appel API Anthropic + parsing (pur, testé)
-│   ├── extract.ts            # parsing HTML → e-mails/tél/socials/contacts (pur, testé)
-│   └── chain.ts              # détection multi-sites (pur, testé)
-├── engine.ts                  # orchestrateur : scraper → pipeline → enrich → exporter
-├── index.ts                   # surface publique du SDK
+│   ├── website.enricher.ts   # emails, phones, socials, legal name, contacts
+│   ├── email-verifier.ts     # MX + SMTP handshake + catch-all
+│   ├── reviews.enricher.ts   # GMaps reviews -> summary/sentiment (Claude API)
+│   ├── review-summary.ts     # Anthropic API call + parsing (pure, tested)
+│   ├── extract.ts            # HTML parsing -> emails/phones/socials/contacts (pure, tested)
+│   └── chain.ts              # multi-site detection (pure, tested)
+├── engine.ts                  # orchestrator: scraper -> pipeline -> enrich -> export
+├── index.ts                   # public SDK surface
 └── cli.ts                     # Commander
 ```
 
-**Patterns** : `Strategy` pour les scrapers (`IScraper`) et les enrichers (`IEnricher`),
-`Decorator` réseau dans le driver (rate-limit / proxy / retry transparents),
-`Repository/Exporter` pour la sortie (`ILeadExporter`).
+**Patterns**: `Strategy` for scrapers (`IScraper`) and enrichers (`IEnricher`),
+`Decorator` for network in the driver (transparent rate-limit / proxy / retry),
+`Repository/Exporter` for output (`ILeadExporter`).
 
-### Ajouter une source
+### Adding a source
 
-1. `src/scrapers/<source>/<source>.scraper.ts` implémentant `IScraper` (générateur async de `RawLead`).
-2. Un parser pur à côté (`<source>.parser.ts`) — c'est lui qu'on teste.
-3. Le brancher dans `ScraperEngine.buildScraper`.
+1. `src/scrapers/<source>/<source>.scraper.ts` implementing `IScraper` (async generator of `RawLead`).
+2. A pure parser next to it (`<source>.parser.ts`): that is the one we test.
+3. Wire it in `ScraperEngine.buildScraper`.
 
-Rien d'autre à toucher : validation, normalisation, dédup et export sont mutualisés.
+Nothing else to touch: validation, normalization, dedup and export are shared.
 
-### Ajouter un enricher
+### Adding an enricher
 
-1. `src/enrichers/<nom>.enricher.ts` implémentant `IEnricher` (`supports` + `enrich` → `LeadPatch`).
-   `enrich` ne doit **jamais** lever : renvoyer `{}` et logger en cas d'échec.
-2. Le déclarer dans `ENRICHER_NAMES` + `createEnricher` (`src/enrichers/index.ts`).
-3. Étendre `LeadPatch` / le schéma `B2BLead` si de nouveaux champs sont produits.
+1. `src/enrichers/<name>.enricher.ts` implementing `IEnricher` (`supports` + `enrich` -> `LeadPatch`).
+   `enrich` must **never** throw: return `{}` and log in case of failure.
+2. Declare it in `ENRICHER_NAMES` + `createEnricher` (`src/enrichers/index.ts`).
+3. Extend `LeadPatch` / the `B2BLead` schema if new fields are produced.
 
-`applyPatch` fusionne le résultat sans écraser les valeurs déjà présentes.
+`applyPatch` merges the result without overwriting values that are already present.
 
 ## Configuration (`.env`)
 
-Voir [`.env.example`](./.env.example). Points clés :
+See [`.env.example`](./.env.example). Key points:
 
-- `RATE_MAX_REQUESTS` / `RATE_INTERVAL_MS` — politesse réseau (défaut 5 req/s).
-- `BROWSER_CONCURRENCY` — pages Playwright en parallèle (défaut 1).
-- `PROXIES` — liste `http://user:pass@host:port` séparée par des virgules (rotation auto).
-- `HEADLESS=false` — utile pour déboguer les sélecteurs Google Maps.
-- `SMTP_CHECK=false` — si le port 25 sortant est bloqué (e-mails alors en `unknown`).
-- `ANTHROPIC_API_KEY` — active le résumé/sentiment des avis.
+- `RATE_MAX_REQUESTS` / `RATE_INTERVAL_MS`: network politeness (default 5 req/s).
+- `BROWSER_CONCURRENCY`: parallel Playwright pages (default 1).
+- `PROXIES`: comma-separated list of `http://user:pass@host:port` entries (auto rotation).
+- `HEADLESS=false`: useful for debugging Google Maps selectors.
+- `SMTP_CHECK=false`: if outbound port 25 is blocked (emails then become `unknown`).
+- `ANTHROPIC_API_KEY`: enables review summary/sentiment.
 
 ## Tests
 
 ```bash
-yarn test        # vitest — 38 tests sur les modules purs
+yarn test        # vitest: 38 tests on the pure modules
 yarn typecheck
 ```
 
-## Limites connues
+## Known limitations
 
-- **Sélecteurs Google Maps** : susceptibles de casser quand Google modifie son DOM.
-  La `catégorie` d'établissement n'est pas toujours captée — nom / ville / adresse /
-  téléphone / site / note sont fiables.
-- **Contacts décideurs** : l'enricher `website` les repère par heuristique (« Nom —
-  Directeur » sur les pages équipe/contact) — bon rappel sur les grands hôtels, faible
-  sur les petits sites. Pas de scraping LinkedIn (CGU + auth requise).
-- **Vérif e-mail** : ~85–90 % de fiabilité ; certains serveurs rejettent le probing
-  (→ `unknown`) ou acceptent tout (`risky` / catch-all).
-- Firmographie (CA, effectif), NAICS/SIC, trafic web : **non disponibles** sans base
-  tierce payante — champs `legalName` / `employeeRange` présents mais non alimentés.
-- Pas de résolution de captcha : fiche ignorée avec un warning. Réduire
-  `RATE_MAX_REQUESTS` et/ou utiliser des proxies résidentiels.
+- **Google Maps selectors**: prone to breaking when Google changes its DOM.
+  The establishment `category` is not always captured: name / city / address /
+  phone / website / rating are reliable.
+- **Decision-maker contacts**: the `website` enricher spots them by heuristic
+  ("Name / Director" on team/contact pages): good recall on large hotels, low
+  recall on small sites. No LinkedIn scraping (ToS + auth required).
+- **Email verification**: ~85-90% reliability; some servers reject the probing
+  (-> `unknown`) or accept everything (`risky` / catch-all).
+- Firmographics (revenue, headcount), NAICS/SIC, web traffic: **not available**
+  without a paid third-party database: `legalName` / `employeeRange` fields exist
+  but are not populated.
+- No captcha solving: record skipped with a warning. Lower
+  `RATE_MAX_REQUESTS` and/or use residential proxies.

@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import type { B2BLead } from '../types/lead.entity.js';
 import type { ExporterResult, ILeadExporter } from '../types/exporter.interface.js';
 
-/** Écrit un tableau JSON indenté, en streaming (pas d'accumulation mémoire). */
+/** Writes an indented JSON array, streaming (no memory accumulation). */
 export class JsonExporter implements ILeadExporter {
   readonly name = 'json';
   private stream: WriteStream | undefined;
@@ -22,14 +22,14 @@ export class JsonExporter implements ILeadExporter {
   }
 
   async write(lead: B2BLead): Promise<void> {
-    if (!this.stream) throw new Error('JsonExporter: open() non appelé');
+    if (!this.stream) throw new Error('JsonExporter: open() not called');
     const prefix = this.count === 0 ? '' : ',\n';
     this.stream.write(prefix + JSON.stringify(lead, null, 2).replace(/^/gm, '  '));
     this.count += 1;
   }
 
   async close(): Promise<ExporterResult> {
-    if (!this.stream) throw new Error('JsonExporter: open() non appelé');
+    if (!this.stream) throw new Error('JsonExporter: open() not called');
     const stream = this.stream;
     await new Promise<void>((res, rej) => {
       stream.on('error', rej);

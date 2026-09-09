@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 /**
- * Rôle normalisé d'un décideur rattaché à une entreprise.
- * `titleRaw` conserve l'intitulé exact trouvé sur la source.
+ * Normalized role of a decision-maker attached to a company.
+ * `titleRaw` keeps the exact title found on the source.
  */
 export const ContactRole = {
   GeneralManager: 'GENERAL_MANAGER',
@@ -21,15 +21,15 @@ export const leadContactSchema = z.object({
   emailDirect: z.string().email().optional(),
   phoneDirect: z.string().optional(),
   linkedinUrl: z.string().url().optional(),
-  /** 0..1 — confiance dans l'exactitude du contact (1 = source directe). */
+  /** 0..1: confidence in the contact accuracy (1 = direct source). */
   confidence: z.number().min(0).max(1).default(1),
 });
 
 export type LeadContact = z.infer<typeof leadContactSchema>;
 
 /**
- * Entité unifiée produite par toutes les stratégies de scraping.
- * Toute source (Google Maps, annuaire, site web) est normalisée vers ce modèle.
+ * Unified entity produced by every scraping strategy.
+ * Any source (Google Maps, directory, website) is normalized to this model.
  */
 export const socialLinksSchema = z.object({
   linkedin: z.string().url().optional(),
@@ -54,7 +54,7 @@ export const reviewsInsightSchema = z.object({
 export type ReviewsInsight = z.infer<typeof reviewsInsightSchema>;
 
 export const b2bLeadSchema = z.object({
-  /** Identifiant stable et déterministe (voir `buildLeadId`). */
+  /** Stable and deterministic identifier (see `buildLeadId`). */
   id: z.string().min(1),
   source: z.string().min(1),
   sourceUrl: z.string().url().optional(),
@@ -76,10 +76,10 @@ export const b2bLeadSchema = z.object({
   googleRating: z.number().min(0).max(5).optional(),
   reviewsCount: z.number().int().nonnegative().optional(),
 
-  // --- Champs alimentés par l'étape d'enrichissement ---
-  /** Tous les e-mails trouvés (le meilleur est aussi dans `email`). */
+  // --- Fields populated by the enrichment step ---
+  /** All emails found (the best one is also in `email`). */
   emails: z.array(z.string().email()).default([]),
-  /** Numéros additionnels au format E.164 (le principal reste `phoneNormalized`). */
+  /** Additional numbers in E.164 format (the main one remains `phoneNormalized`). */
   phones: z.array(z.string()).default([]),
   socials: socialLinksSchema.default({}),
   emailStatus: z.enum(['valid', 'invalid', 'risky', 'unknown']).optional(),
@@ -88,7 +88,7 @@ export const b2bLeadSchema = z.object({
   employeeRange: z.string().optional(),
   chain: z.object({ isChain: z.boolean(), name: z.string().optional() }).optional(),
   reviews: reviewsInsightSchema.optional(),
-  /** Noms des enrichers appliqués à ce lead. */
+  /** Names of the enrichers applied to this lead. */
   enrichedBy: z.array(z.string()).default([]),
 
   contacts: z.array(leadContactSchema).default([]),
@@ -99,7 +99,7 @@ export const b2bLeadSchema = z.object({
 
 export type B2BLead = z.infer<typeof b2bLeadSchema>;
 
-/** Forme brute acceptée avant validation/normalisation par le pipeline. */
+/** Raw shape accepted before validation/normalization by the pipeline. */
 export type RawLead = Partial<Omit<B2BLead, 'contacts' | 'metadata'>> & {
   companyName: string;
   source: string;

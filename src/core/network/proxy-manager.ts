@@ -1,16 +1,16 @@
 export interface ProxyConfig {
-  /** Protocole + hôte + port, ex: `http://12.34.56.78:8000`. */
+  /** Protocol + host + port, e.g. `http://12.34.56.78:8000`. */
   server: string;
   username?: string;
   password?: string;
 }
 
 /**
- * Parse une liste de proxies séparés par des virgules.
- * Formats acceptés par entrée :
+ * Parses a comma-separated list of proxies.
+ * Accepted formats per entry:
  *   - `http://user:pass@host:port`
  *   - `http://host:port`
- *   - `host:port` (protocole `http` supposé)
+ *   - `host:port` (`http` protocol assumed)
  */
 export function parseProxyList(raw: string): ProxyConfig[] {
   return raw
@@ -31,7 +31,7 @@ export function parseProxyEntry(entry: string): ProxyConfig {
   return config;
 }
 
-/** Construit l'URL complète (avec credentials inline) exploitable par un agent HTTP. */
+/** Builds the full URL (with inline credentials) usable by an HTTP agent. */
 export function proxyToUrl(proxy: ProxyConfig): string {
   if (!proxy.username && !proxy.password) return proxy.server;
   const url = new URL(proxy.server);
@@ -41,9 +41,9 @@ export function proxyToUrl(proxy: ProxyConfig): string {
 }
 
 /**
- * Rotation Round-Robin d'un pool de proxies statiques. Pour un proxy résidentiel
- * rotatif (BrightData, etc.), fournir une seule entrée : la rotation est gérée
- * côté fournisseur.
+ * Round-Robin rotation over a pool of static proxies. For a rotating
+ * residential proxy (BrightData, etc.), provide a single entry: rotation is
+ * handled by the provider.
  */
 export class ProxyManager {
   private index = 0;
@@ -58,7 +58,7 @@ export class ProxyManager {
     return this.proxies.length > 0;
   }
 
-  /** Proxy suivant, ou `undefined` si aucun proxy configuré. */
+  /** Next proxy, or `undefined` if no proxy is configured. */
   next(): ProxyConfig | undefined {
     if (this.proxies.length === 0) return undefined;
     const proxy = this.proxies[this.index % this.proxies.length];
@@ -66,7 +66,7 @@ export class ProxyManager {
     return proxy;
   }
 
-  /** Proxy courant sans avancer le curseur. */
+  /** Current proxy without advancing the cursor. */
   peek(): ProxyConfig | undefined {
     if (this.proxies.length === 0) return undefined;
     return this.proxies[this.index % this.proxies.length];
