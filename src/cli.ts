@@ -9,8 +9,8 @@ import type { LogLevel } from './core/logger.js';
 const program = new Command();
 
 program
-  .name('b2b-scraper')
-  .description("Extraction de leads B2B (Google Maps, annuaires) — sans API tierce payante")
+  .name('vestra')
+  .description('Vestra — extraction et enrichissement de leads B2B (Google Maps, annuaires)')
   .version('0.1.0');
 
 program
@@ -38,7 +38,7 @@ program
   )
   .action(async (opts) => {
     const startedAt = Date.now();
-    console.error(chalk.bold.cyan('\n  b2b-scraper — extraction\n'));
+    console.error(chalk.bold.cyan('\n  vestra — extraction\n'));
 
     const engine = new ScraperEngine({ logLevel: opts.logLevel as LogLevel });
     const controller = new AbortController();

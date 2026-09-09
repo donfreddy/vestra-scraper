@@ -1,8 +1,8 @@
-# @meragix/b2b-scraper
+# Vestra
 
-Module interne d'extraction de **leads B2B** (Google Maps, annuaires) en **Node.js / TypeScript**,
-sans dépendre d'une API tierce payante. Conçu pour être réutilisé dans d'autres projets
-(SDK) ou lancé en ligne de commande (CLI).
+**Vestra** — module interne d'extraction et d'enrichissement de **leads B2B** (Google Maps,
+annuaires) en **Node.js / TypeScript**, sans dépendre d'une API tierce payante. Conçu pour
+être réutilisé dans d'autres projets (SDK) ou lancé en ligne de commande (CLI `vestra`).
 
 Issu du cadrage décrit dans [`gemini.md`](./gemini.md). Périmètre actuel :
 
@@ -34,7 +34,7 @@ yarn cli extract -q "Hôtel" -l "Douala, Cameroun" -o ./out/hotels_douala.xlsx
 
 # Après build / lien global
 yarn build && npm link
-b2b-scraper extract -q "Hôtel" -l "Kribi, Cameroun" -n 50 -f csv -o ./out/kribi.csv
+vestra extract -q "Hôtel" -l "Kribi, Cameroun" -n 50 -f csv -o ./out/kribi.csv
 ```
 
 | Option | Description | Défaut |
@@ -56,8 +56,8 @@ b2b-scraper extract -q "Hôtel" -l "Kribi, Cameroun" -n 50 -f csv -o ./out/kribi
 ### Enrichissement
 
 ```bash
-b2b-scraper extract -q "Hôtel" -l "Douala, Cameroun" --enrich website,email -o ./out/douala.xlsx
-b2b-scraper extract -q "Hôtel" -l "Kribi, Cameroun"  --enrich all           -o ./out/kribi.xlsx
+vestra extract -q "Hôtel" -l "Douala, Cameroun" --enrich website,email -o ./out/douala.xlsx
+vestra extract -q "Hôtel" -l "Kribi, Cameroun"  --enrich all           -o ./out/kribi.xlsx
 ```
 
 | Enricher | Source | Ajoute | Dépendance |
@@ -75,7 +75,7 @@ qu'un enricher est actif : enseignes connues + même marque repérée dans ≥ 2
 ## Utilisation — SDK
 
 ```ts
-import { ScraperEngine } from '@meragix/b2b-scraper';
+import { ScraperEngine } from 'vestra';
 
 const engine = new ScraperEngine({ logLevel: 'info' });
 const { leads, stats, export: out } = await engine.run({
