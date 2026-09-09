@@ -3,10 +3,18 @@ import { Logger, type LogLevel } from './core/logger.js';
 import { BrowserDriver } from './core/driver/browser.driver.js';
 import { HttpDriver } from './core/driver/http.driver.js';
 import { LeadPipeline } from './core/pipeline/pipeline.js';
+import { applyPatch } from './core/pipeline/merge.js';
 import { createExporter, resolveFormat } from './core/exporters/index.js';
 import { GoogleMapsScraper } from './scrapers/google-maps/gmaps.scraper.js';
+import {
+  createEnricher,
+  detectChains,
+  parseEnricherList,
+  type EnricherName,
+} from './enrichers/index.js';
 import { scraperQuerySchema, type IScraper, type ScraperQuery } from './core/types/scraper.interface.js';
 import type { B2BLead } from './core/types/lead.entity.js';
+import type { EnrichContext, IEnricher } from './core/types/enricher.interface.js';
 import type { ExportFormat, ExporterResult } from './core/types/exporter.interface.js';
 import type { PipelineStats } from './core/pipeline/pipeline.js';
 
@@ -26,20 +34,28 @@ export interface RunOptions {
   /** Chemin du fichier de sortie. Le format est déduit de l'extension. */
   output: string;
   format?: ExportFormat;
+  /** Liste d'enrichers : `"website,email"`, `"all"`, ou vide pour aucun. */
+  enrich?: string;
   signal?: AbortSignal;
+}
+
+export interface EnrichmentSummary {
+  enrichers: EnricherName[];
+  leadsEnriched: number;
+  chainsDetected: number;
 }
 
 export interface RunResult {
   leads: B2BLead[];
   stats: PipelineStats;
   export: ExporterResult;
+  enrichment?: EnrichmentSummary;
   durationMs: number;
 }
 
 /**
- * Orchestrateur : instancie le driver adéquat, lance la stratégie de scraping,
- * fait passer le flux dans le pipeline (validation + normalisation + dédup) et
- * pousse chaque lead propre vers l'exporter choisi.
+ * Orchestrateur : scraping (Strategy) -> pipeline (validation / normalisation /
+ * dédup) -> enrichissement optionnel -> export.
  */
 export class ScraperEngine {
   private readonly config: AppConfig;
@@ -62,6 +78,27 @@ export class ScraperEngine {
     }
   }
 
+  createHttpDriver(): HttpDriver {
+    return new HttpDriver({
+      proxies: this.config.proxies,
+      rateLimit: { maxRequests: this.config.rate.maxRequests, intervalMs: this.config.rate.intervalMs },
+      retry: { retries: this.config.retry.retries, baseDelayMs: this.config.retry.baseDelayMs },
+      logger: this.logger,
+    });
+  }
+
+  private newBrowser(): BrowserDriver {
+    return new BrowserDriver({
+      headless: this.config.headless,
+      locale: this.config.browserLocale,
+      timezone: this.config.browserTimezone,
+      proxies: this.config.proxies,
+      concurrency: this.config.browserConcurrency,
+      navigationRate: { maxRequests: this.config.rate.maxRequests, intervalMs: this.config.rate.intervalMs },
+      logger: this.logger,
+    });
+  }
+
   async run(options: RunOptions): Promise<RunResult> {
     const started = Date.now();
     const query: ScraperQuery = scraperQuerySchema.parse({
@@ -71,51 +108,119 @@ export class ScraperEngine {
       limit: options.limit ?? 0,
     });
 
-    const format = resolveFormat(options.output, options.format);
-    const exporter = createExporter(format, options.output);
-
-    const browser = new BrowserDriver({
-      headless: this.config.headless,
-      locale: this.config.browserLocale,
-      timezone: this.config.browserTimezone,
-      proxies: this.config.proxies,
-      concurrency: this.config.browserConcurrency,
-      navigationRate: { maxRequests: this.config.rate.maxRequests, intervalMs: this.config.rate.intervalMs },
-      logger: this.logger,
-    });
-
+    const enricherNames = parseEnricherList(options.enrich);
+    const exporter = createExporter(resolveFormat(options.output, options.format), options.output);
+    const browser = this.newBrowser();
     const scraper = this.buildScraper(options.source ?? 'google-maps', browser);
     const pipeline = new LeadPipeline(
       { defaultCountry: query.country, fallbackCity: query.location.split(',')[0]?.trim() },
       this.logger.child('pipeline'),
     );
 
+    const streaming = enricherNames.length === 0;
     const leads: B2BLead[] = [];
-    await exporter.open();
+
+    if (streaming) await exporter.open();
+
     try {
       const source = scraper.execute(query, { logger: this.logger, signal: options.signal });
       for await (const lead of pipeline.run(source)) {
         leads.push(lead);
-        await exporter.write(lead);
+        if (streaming) await exporter.write(lead);
         this.logger.info(`✓ ${lead.companyName}${lead.city ? ` — ${lead.city}` : ''}`);
       }
+
+      let enrichment: EnrichmentSummary | undefined;
+      if (!streaming) {
+        enrichment = await this.enrich(leads, enricherNames, browser, options.signal);
+        await exporter.open();
+        for (const lead of leads) await exporter.write(lead);
+      }
+
+      const exportResult = await exporter.close();
+      return {
+        leads,
+        stats: pipeline.stats,
+        export: exportResult,
+        ...(enrichment ? { enrichment } : {}),
+        durationMs: Date.now() - started,
+      };
     } finally {
       await browser.close().catch((e) => this.logger.warn('fermeture navigateur:', e as Error));
     }
-
-    const exportResult = await exporter.close();
-    return { leads, stats: pipeline.stats, export: exportResult, durationMs: Date.now() - started };
   }
 
-  /** Accès à un driver HTTP configuré (rate-limit + proxies + retry) pour un futur scraper d'annuaire. */
-  createHttpDriver(): HttpDriver {
-    return new HttpDriver({
-      proxies: this.config.proxies,
-      rateLimit: this.config.rate.maxRequests
-        ? { maxRequests: this.config.rate.maxRequests, intervalMs: this.config.rate.intervalMs }
-        : undefined,
-      retry: { retries: this.config.retry.retries, baseDelayMs: this.config.retry.baseDelayMs },
-      logger: this.logger,
+  private async enrich(
+    leads: B2BLead[],
+    names: EnricherName[],
+    browser: BrowserDriver,
+    signal: AbortSignal | undefined,
+  ): Promise<EnrichmentSummary> {
+    const log = this.logger.child('enrich');
+    log.info(`enrichissement (${names.join(', ')}) sur ${leads.length} leads`);
+
+    const enrichers: IEnricher[] = names.map((n) =>
+      createEnricher(n, {
+        smtpProbe: this.config.enrichment.smtpProbe,
+        smtpFrom: this.config.enrichment.smtpFrom,
+        websiteMaxPages: this.config.enrichment.websiteMaxPages,
+      }),
+    );
+
+    const ctx: EnrichContext = {
+      http: this.createHttpDriver(),
+      browser,
+      logger: log,
+      country: this.config.defaultCountry,
+      ...(signal ? { signal } : {}),
+      ...(this.config.enrichment.anthropicApiKey
+        ? { anthropicApiKey: this.config.enrichment.anthropicApiKey }
+        : {}),
+    };
+
+    let enriched = 0;
+    await mapPool(leads, this.config.enrichment.concurrency, async (lead, index) => {
+      if (signal?.aborted) return;
+      let current = lead;
+      let touched = false;
+      for (const enricher of enrichers) {
+        if (!enricher.supports(current)) continue;
+        try {
+          const patch = await enricher.enrich(current, ctx);
+          if (Object.keys(patch).length > 0) {
+            current = applyPatch(current, patch, enricher.name);
+            touched = true;
+          }
+        } catch (error) {
+          log.warn(`${enricher.name} a échoué sur "${current.companyName}": ${(error as Error).message}`);
+        }
+      }
+      leads[index] = current;
+      if (touched) enriched += 1;
     });
+
+    detectChains(leads);
+    const chainsDetected = leads.filter((l) => l.chain?.isChain).length;
+    log.info(`${enriched} leads enrichis · ${chainsDetected} rattachés à une chaîne`);
+
+    return { enrichers: names, leadsEnriched: enriched, chainsDetected };
   }
+}
+
+/** Applique `worker` sur `items` avec au plus `concurrency` tâches simultanées. */
+async function mapPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  const size = Math.max(1, concurrency);
+  const runners = Array.from({ length: Math.min(size, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      await worker(items[index]!, index);
+    }
+  });
+  await Promise.all(runners);
 }

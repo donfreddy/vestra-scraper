@@ -31,6 +31,28 @@ export type LeadContact = z.infer<typeof leadContactSchema>;
  * Entité unifiée produite par toutes les stratégies de scraping.
  * Toute source (Google Maps, annuaire, site web) est normalisée vers ce modèle.
  */
+export const socialLinksSchema = z.object({
+  linkedin: z.string().url().optional(),
+  facebook: z.string().url().optional(),
+  instagram: z.string().url().optional(),
+  twitter: z.string().url().optional(),
+  youtube: z.string().url().optional(),
+  tiktok: z.string().url().optional(),
+  whatsapp: z.string().optional(),
+});
+export type SocialLinks = z.infer<typeof socialLinksSchema>;
+
+export type EmailStatus = 'valid' | 'invalid' | 'risky' | 'unknown';
+
+export const reviewsInsightSchema = z.object({
+  count: z.number().int().nonnegative().optional(),
+  average: z.number().min(0).max(5).optional(),
+  summary: z.string().optional(),
+  sentiment: z.enum(['positive', 'mixed', 'negative']).optional(),
+  highlights: z.array(z.string()).default([]),
+});
+export type ReviewsInsight = z.infer<typeof reviewsInsightSchema>;
+
 export const b2bLeadSchema = z.object({
   /** Identifiant stable et déterministe (voir `buildLeadId`). */
   id: z.string().min(1),
@@ -53,6 +75,21 @@ export const b2bLeadSchema = z.object({
 
   googleRating: z.number().min(0).max(5).optional(),
   reviewsCount: z.number().int().nonnegative().optional(),
+
+  // --- Champs alimentés par l'étape d'enrichissement ---
+  /** Tous les e-mails trouvés (le meilleur est aussi dans `email`). */
+  emails: z.array(z.string().email()).default([]),
+  /** Numéros additionnels au format E.164 (le principal reste `phoneNormalized`). */
+  phones: z.array(z.string()).default([]),
+  socials: socialLinksSchema.default({}),
+  emailStatus: z.enum(['valid', 'invalid', 'risky', 'unknown']).optional(),
+  emailCatchAll: z.boolean().optional(),
+  legalName: z.string().optional(),
+  employeeRange: z.string().optional(),
+  chain: z.object({ isChain: z.boolean(), name: z.string().optional() }).optional(),
+  reviews: reviewsInsightSchema.optional(),
+  /** Noms des enrichers appliqués à ce lead. */
+  enrichedBy: z.array(z.string()).default([]),
 
   contacts: z.array(leadContactSchema).default([]),
   metadata: z.record(z.unknown()).default({}),

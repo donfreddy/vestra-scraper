@@ -27,6 +27,10 @@ program
   .addOption(new Option('-f, --format <format>', "Force le format d'export").choices(['excel', 'csv', 'json']))
   .option('-c, --country <iso2>', 'Pays ISO-2 pour la normalisation des téléphones', 'CM')
   .option('-n, --limit <n>', 'Nombre max de fiches (0 = illimité)', '0')
+  .option(
+    '-e, --enrich <liste>',
+    'Enrichissement : "website", "email", "reviews", combinés par virgule, ou "all"',
+  )
   .addOption(
     new Option('--log-level <niveau>', 'Verbosité')
       .choices(['debug', 'info', 'warn', 'error', 'silent'])
@@ -56,6 +60,7 @@ program
         format: opts.format as ExportFormat | undefined,
         country: opts.country,
         limit: Number.parseInt(opts.limit, 10) || 0,
+        ...(opts.enrich ? { enrich: opts.enrich as string } : {}),
         signal: controller.signal,
       });
 
@@ -67,9 +72,18 @@ program
           `    reçus ${s.received} · doublons ${s.duplicates} · invalides ${s.invalid} · ${(
             (Date.now() - startedAt) /
             1000
-          ).toFixed(1)}s\n`,
+          ).toFixed(1)}s`,
         ),
       );
+      if (result.enrichment) {
+        const e = result.enrichment;
+        console.error(
+          chalk.gray(
+            `    enrichis ${e.leadsEnriched}/${s.accepted} via ${e.enrichers.join('+')} · chaînes ${e.chainsDetected}`,
+          ),
+        );
+      }
+      console.error('');
     } catch (error) {
       spinner.stop();
       console.error(chalk.red(`\n  ✗ Échec : ${(error as Error).message}\n`));

@@ -22,6 +22,12 @@ const envSchema = z.object({
 
   PROXIES: z.string().default(''),
   DEFAULT_COUNTRY: z.string().length(2).default('CM'),
+
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  SMTP_CHECK: boolish.default(true),
+  SMTP_FROM: z.string().default('verify@example.com'),
+  ENRICH_CONCURRENCY: z.coerce.number().int().positive().default(3),
+  WEBSITE_MAX_PAGES: z.coerce.number().int().positive().default(4),
 });
 
 export interface AppConfig {
@@ -33,6 +39,13 @@ export interface AppConfig {
   retry: { retries: number; baseDelayMs: number };
   proxies: ProxyConfig[];
   defaultCountry: string;
+  enrichment: {
+    anthropicApiKey?: string;
+    smtpProbe: boolean;
+    smtpFrom: string;
+    concurrency: number;
+    websiteMaxPages: number;
+  };
 }
 
 let cached: AppConfig | undefined;
@@ -50,6 +63,13 @@ export function loadConfig(overrides: Partial<NodeJS.ProcessEnv> = {}): AppConfi
     retry: { retries: parsed.MAX_RETRIES, baseDelayMs: parsed.RETRY_BASE_DELAY_MS },
     proxies: parseProxyList(parsed.PROXIES),
     defaultCountry: parsed.DEFAULT_COUNTRY.toUpperCase(),
+    enrichment: {
+      anthropicApiKey: parsed.ANTHROPIC_API_KEY,
+      smtpProbe: parsed.SMTP_CHECK,
+      smtpFrom: parsed.SMTP_FROM,
+      concurrency: parsed.ENRICH_CONCURRENCY,
+      websiteMaxPages: parsed.WEBSITE_MAX_PAGES,
+    },
   };
 
   if (Object.keys(overrides).length === 0) cached = config;
