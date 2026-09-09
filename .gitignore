@@ -15,3 +15,21 @@ node_modules
 
 #!.yarn/cache
 .pnp.*
+
+# Build
+dist
+
+# Env
+.env
+.env.local
+
+# Sorties de scraping
+out
+output
+*.xlsx
+*.csv
+!tests/**/*.csv
+
+# Logs / divers
+*.log
+.DS_Store
