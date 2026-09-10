@@ -122,6 +122,12 @@ export class GoogleMapsScraper implements IScraper {
     }
 
     log.info(`${placeUrls.urls.length} places to visit`);
+    if (placeUrls.urls.length >= 115 && !query.limit) {
+      log.warn(
+        `~${placeUrls.urls.length} results for "${query.query}" @ "${query.location}" — likely at Google's ` +
+          `~120 cap. Split the area into neighborhoods or vary the term for fuller coverage.`,
+      );
+    }
 
     // 2. Visit each place to extract the details.
     let done = 0;

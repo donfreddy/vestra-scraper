@@ -8,6 +8,9 @@ import type { LogLevel } from './core/logger.js';
 
 const program = new Command();
 
+/** Commander collector: lets `-q`/`-l` be repeated into an array. */
+const collect = (value: string, previous?: string[]): string[] => [...(previous ?? []), value];
+
 program
   .name('vestra')
   .description('Vestra. B2B lead extraction and enrichment (Google Maps, directories)')
@@ -16,8 +19,12 @@ program
 program
   .command('extract')
   .description("Runs an extraction session and exports the result")
-  .requiredOption('-q, --query <term>', 'Business term, e.g. "Hotel"')
-  .requiredOption('-l, --location <area>', 'Target area, e.g. "Douala, Cameroon"')
+  .requiredOption('-q, --query <term>', 'Business term, e.g. "Hôtel" (repeatable)', collect)
+  .requiredOption(
+    '-l, --location <area>',
+    'Target area, e.g. "Akwa, Douala" (repeatable — each pairs with each query)',
+    collect,
+  )
   .addOption(
     new Option('-s, --source <source>', 'Collection source')
       .choices(['gmaps', 'google-maps'])
@@ -49,7 +56,14 @@ program
     };
     process.on('SIGINT', onSigint);
 
-    const spinner = ora({ text: `Collecting: "${opts.query}" @ "${opts.location}"`, stream: process.stderr });
+    const nSearches = (opts.query as string[]).length * (opts.location as string[]).length;
+    const spinner = ora({
+      text:
+        nSearches > 1
+          ? `Collecting: ${nSearches} searches (${(opts.query as string[]).join('/')} × ${(opts.location as string[]).length} areas)`
+          : `Collecting: "${opts.query}" @ "${opts.location}"`,
+      stream: process.stderr,
+    });
     if (opts.logLevel === 'info') spinner.start();
 
     try {

@@ -22,8 +22,10 @@ export interface EngineOptions {
 }
 
 export interface RunOptions {
-  query: string;
-  location: string;
+  /** One or more business terms (e.g. "Hôtel", "Auberge"). */
+  query: string | string[];
+  /** One or more target areas (e.g. neighborhoods). Each pairs with each query. */
+  location: string | string[];
   source?: SourceName;
   limit?: number;
   country?: string;
@@ -100,24 +102,38 @@ export class ScraperEngine {
 
   async run(options: RunOptions): Promise<RunResult> {
     const started = Date.now();
-    const query: ScraperQuery = scraperQuerySchema.parse({
-      query: options.query,
-      location: options.location,
-      country: options.country ?? this.config.defaultCountry,
-      limit: options.limit ?? 0,
-    });
+    const country = (options.country ?? this.config.defaultCountry).toUpperCase();
+    const limit = options.limit ?? 0;
+    const queries = toList(options.query);
+    const locations = toList(options.location);
+    if (queries.length === 0 || locations.length === 0) {
+      throw new Error('run(): at least one query and one location are required');
+    }
+
+    // Every (query × location) pair becomes one search; the shared pipeline
+    // deduplicates across all of them.
+    const searches: ScraperQuery[] = [];
+    for (const q of queries) {
+      for (const loc of locations) {
+        searches.push(scraperQuerySchema.parse({ query: q, location: loc, country, limit }));
+      }
+    }
 
     const enricherNames = parseEnricherList(options.enrich);
     const exporter = createExporter(resolveFormat(options.output, options.format), options.output);
     const browser = this.newBrowser();
     const scraper = this.buildScraper(options.source ?? 'google-maps', browser);
     const pipeline = new LeadPipeline(
-      { defaultCountry: query.country, fallbackCity: query.location.split(',')[0]?.trim() },
+      { defaultCountry: country, fallbackCity: locations[0]!.split(',')[0]?.trim() },
       this.logger.child('pipeline'),
     );
 
     const willEnrich = enricherNames.length > 0;
-    const signature = `${options.source ?? 'gmaps'}|${query.query}|${query.location}|${enricherNames.join(',')}`;
+    const signature = [
+      options.source ?? 'gmaps',
+      searches.map((s) => `${s.query}@${s.location}`).sort().join(';'),
+      enricherNames.join(','),
+    ].join('|');
     const checkpoint = new CheckpointStore(options.output, signature);
     if (options.fresh) checkpoint.clear();
     const restored = options.fresh ? new Map<string, VestraLead>() : checkpoint.load(this.logger);
@@ -126,14 +142,21 @@ export class ScraperEngine {
     const leads: VestraLead[] = [...restored.values()];
 
     try {
-      // 1. Scrape — skip places already captured by a previous run, persist each
-      //    new one immediately so an interrupted scrape isn't lost.
-      const source = scraper.execute(query, { logger: this.logger, signal: options.signal });
-      for await (const lead of pipeline.run(source)) {
-        if (restored.has(lead.id)) continue;
-        leads.push(lead);
-        checkpoint.append(lead);
-        this.logger.info(`✓ ${lead.companyName}${lead.city ? ` — ${lead.city}` : ''}`);
+      // 1. Scrape every search through one shared pipeline (single dedup pass);
+      //    persist each new lead immediately so an interrupted scrape isn't lost.
+      if (searches.length > 1) this.logger.info(`${searches.length} searches queued`);
+      for (const [i, search] of searches.entries()) {
+        if (options.signal?.aborted) break;
+        if (searches.length > 1) {
+          this.logger.info(`[${i + 1}/${searches.length}] "${search.query}" @ "${search.location}"`);
+        }
+        const source = scraper.execute(search, { logger: this.logger, signal: options.signal });
+        for await (const lead of pipeline.run(source)) {
+          if (restored.has(lead.id)) continue;
+          leads.push(lead);
+          checkpoint.append(lead);
+          this.logger.info(`✓ ${lead.companyName}${lead.city ? ` — ${lead.city}` : ''}`);
+        }
       }
 
       // 2. Enrich — only leads not yet attempted (fresh + partially-done runs).
@@ -225,6 +248,11 @@ export class ScraperEngine {
 
     return { enrichers: names, leadsEnriched: enriched, chainsDetected };
   }
+}
+
+/** Normalizes a `string | string[]` option into a trimmed, non-empty list. */
+function toList(value: string | string[]): string[] {
+  return (Array.isArray(value) ? value : [value]).map((s) => s.trim()).filter(Boolean);
 }
 
 /** Applies `worker` to `items` with at most `concurrency` simultaneous tasks. */
