@@ -63,9 +63,9 @@ const LEGAL_RE =
   /\b([A-ZÀ-Ÿ][\w&'.\- ]{2,60}?)\s+(S\.?A\.?R\.?L\.?|SARL|S\.?A\.?|SA|SNC|GIE|E\.?U\.?R\.?L\.?|SUARL|SAS)\b/;
 
 export function extractLegalName(text: string): string | undefined {
-  const m = text.replace(/\s+/g, ' ').match(LEGAL_RE);
+  const m = new RegExp(LEGAL_RE).exec(text.replace(/\s+/g, ' '));
   if (!m) return undefined;
-  return `${m[1]!.trim()} ${m[2]!.replace(/\./g, '').toUpperCase()}`.trim();
+  return `${m[1]!.trim()} ${m[2]!.replaceAll('.', '').toUpperCase()}`.trim();
 }
 
 const NAME = "[A-ZÀ-Ÿ][\\p{L}'’-]+(?:\\s+[A-ZÀ-Ÿ][\\p{L}'’.-]+){1,2}";

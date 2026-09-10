@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import ExcelJS from 'exceljs';
-import type { B2BLead } from '../types/lead.entity.js';
+import type { VestraLead } from '../types/lead.entity.js';
 import type { ExporterResult, ILeadExporter } from '../types/exporter.interface.js';
 import { LEAD_COLUMNS, flattenLead } from './flatten.js';
 
@@ -55,7 +55,7 @@ export class ExcelExporter implements ILeadExporter {
     this.contactSheet.getRow(1).font = { bold: true };
   }
 
-  async write(lead: B2BLead): Promise<void> {
+  async write(lead: VestraLead): Promise<void> {
     if (!this.leadSheet || !this.contactSheet) throw new Error('ExcelExporter: open() not called');
     this.leadSheet.addRow(flattenLead(lead)).commit();
     for (const c of lead.contacts) {

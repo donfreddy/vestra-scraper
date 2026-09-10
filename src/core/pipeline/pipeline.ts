@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import {
-  b2bLeadSchema,
+  vestraLeadSchema,
   leadContactSchema,
   ContactRole,
-  type B2BLead,
+  type VestraLead,
   type RawLead,
 } from '../types/lead.entity.js';
 import { normalizeCity, cityKey } from './city-normalizer.js';
@@ -48,7 +48,7 @@ function cleanUrl(url: string | undefined): string | undefined {
 
 function cleanEmail(email: string | undefined): string | undefined {
   if (!email) return undefined;
-  const m = email.trim().toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/);
+  const m = new RegExp(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/).exec(email.trim().toLowerCase());
   return m ? m[0] : undefined;
 }
 
@@ -62,7 +62,7 @@ export interface NormalizeOptions {
  * Validates and normalizes a raw lead. Throws a `ZodError` when the
  * essential fields (name, source) are missing/invalid.
  */
-export function normalizeLead(raw: RawLead, options: NormalizeOptions = {}): B2BLead {
+export function normalizeLead(raw: RawLead, options: NormalizeOptions = {}): VestraLead {
   const country = (raw.country ?? options.defaultCountry ?? 'CM').toUpperCase();
   const city = normalizeCity(raw.city) || normalizeCity(options.fallbackCity) || '';
 
@@ -83,7 +83,7 @@ export function normalizeLead(raw: RawLead, options: NormalizeOptions = {}): B2B
 
   const companyName = raw.companyName.replace(/\s+/g, ' ').trim();
 
-  return b2bLeadSchema.parse({
+  return vestraLeadSchema.parse({
     id: raw.id ?? buildLeadId(raw.source, companyName, city),
     source: raw.source,
     sourceUrl: cleanUrl(raw.sourceUrl),
@@ -102,7 +102,7 @@ export function normalizeLead(raw: RawLead, options: NormalizeOptions = {}): B2B
     reviewsCount: raw.reviewsCount,
     contacts,
     metadata: {
-      ...(raw.metadata ?? {}),
+      ...raw.metadata,
       phoneValid: phone.valid,
     },
     scrapedAt: raw.scrapedAt ?? new Date(),
@@ -129,10 +129,10 @@ export class LeadPipeline {
     private readonly logger: Logger,
   ) {}
 
-  async *run(source: AsyncIterable<RawLead>): AsyncGenerator<B2BLead> {
+  async *run(source: AsyncIterable<RawLead>): AsyncGenerator<VestraLead> {
     for await (const raw of source) {
       this.stats.received += 1;
-      let lead: B2BLead;
+      let lead: VestraLead;
       try {
         lead = normalizeLead(raw, this.options);
       } catch (error) {

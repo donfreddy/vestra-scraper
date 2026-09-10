@@ -1,5 +1,5 @@
 import type { CheerioAPI } from 'cheerio';
-import type { B2BLead } from '../core/types/lead.entity.js';
+import type { VestraLead } from '../core/types/lead.entity.js';
 import type { EnrichContext, IEnricher, LeadPatch } from '../core/types/enricher.interface.js';
 import { leadContactSchema } from '../core/types/lead.entity.js';
 import { extractContacts, extractEmails, extractLegalName, extractPhones, extractSocials } from './extract.js';
@@ -38,11 +38,11 @@ export class WebsiteEnricher implements IEnricher {
     this.maxPages = Math.max(1, options.maxPages ?? 4);
   }
 
-  supports(lead: B2BLead): boolean {
+  supports(lead: VestraLead): boolean {
     return Boolean(lead.websiteUrl);
   }
 
-  async enrich(lead: B2BLead, ctx: EnrichContext): Promise<LeadPatch> {
+  async enrich(lead: VestraLead, ctx: EnrichContext): Promise<LeadPatch> {
     const log = ctx.logger.child(this.name);
     const base = new URL(lead.websiteUrl!);
 

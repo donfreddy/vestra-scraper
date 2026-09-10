@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import type { B2BLead, ReviewsInsight } from '../core/types/lead.entity.js';
+import type { VestraLead, ReviewsInsight } from '../core/types/lead.entity.js';
 import type { EnrichContext, IEnricher, LeadPatch } from '../core/types/enricher.interface.js';
 import { summarizeReviews, type RawReview } from './review-summary.js';
 
@@ -39,11 +39,11 @@ export class ReviewsEnricher implements IEnricher {
     this.maxReviews = options.maxReviews ?? 25;
   }
 
-  supports(lead: B2BLead): boolean {
+  supports(lead: VestraLead): boolean {
     return Boolean(lead.sourceUrl && /google\.[a-z.]+\/maps\/place\//.test(lead.sourceUrl));
   }
 
-  async enrich(lead: B2BLead, ctx: EnrichContext): Promise<LeadPatch> {
+  async enrich(lead: VestraLead, ctx: EnrichContext): Promise<LeadPatch> {
     if (!ctx.browser) {
       ctx.logger.child(this.name).warn('BrowserDriver required: enricher ignored');
       return {};
@@ -115,7 +115,7 @@ export class ReviewsEnricher implements IEnricher {
 }
 
 function parseRatingLabel(label: string): number | undefined {
-  const m = label.replace(',', '.').match(/(\d+(\.\d+)?)\s*(étoile|star)/i) ?? label.match(/(\d+(\.\d+)?)/);
+  const m = new RegExp(/(\d+(\.\d+)?)\s*(étoile|star)/i).exec(label.replace(',', '.')) ?? new RegExp(/(\d+(\.\d+)?)/).exec(label);
   if (!m) return undefined;
   const v = Number.parseFloat(m[1]!);
   return v >= 0 && v <= 5 ? v : undefined;

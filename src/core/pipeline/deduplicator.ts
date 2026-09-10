@@ -1,4 +1,4 @@
-import type { B2BLead } from '../types/lead.entity.js';
+import type { VestraLead } from '../types/lead.entity.js';
 import { cityKey } from './city-normalizer.js';
 
 function companyKey(name: string): string {
@@ -13,7 +13,7 @@ function companyKey(name: string): string {
 export interface DedupeDecision {
   duplicate: boolean;
   reason?: 'name+city' | 'phone' | 'website';
-  /** Id of the already seen lead that triggered the rejection. */
+  /** I'd of the already seen lead that triggered the rejection. */
   matchedId?: string;
 }
 
@@ -37,7 +37,7 @@ export class Deduplicator {
     }
   }
 
-  inspect(lead: B2BLead): DedupeDecision {
+  inspect(lead: VestraLead): DedupeDecision {
     const nameCity = `${companyKey(lead.companyName)}::${cityKey(lead.city)}`;
     if (companyKey(lead.companyName) && this.byNameCity.has(nameCity)) {
       return { duplicate: true, reason: 'name+city', matchedId: this.byNameCity.get(nameCity)! };
@@ -52,8 +52,8 @@ export class Deduplicator {
     return { duplicate: false };
   }
 
-  /** Records the lead as "seen". Only call this for non-duplicates. */
-  remember(lead: B2BLead): void {
+  /** Records the VestraLead as "seen". Only call this for non-duplicates. */
+  remember(lead: VestraLead): void {
     if (companyKey(lead.companyName)) {
       this.byNameCity.set(`${companyKey(lead.companyName)}::${cityKey(lead.city)}`, lead.id);
     }
@@ -63,7 +63,7 @@ export class Deduplicator {
   }
 
   /** Combines `inspect` + `remember`. Returns `true` if the lead is a duplicate. */
-  isDuplicate(lead: B2BLead): boolean {
+  isDuplicate(lead: VestraLead): boolean {
     const decision = this.inspect(lead);
     if (!decision.duplicate) this.remember(lead);
     return decision.duplicate;

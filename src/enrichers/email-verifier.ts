@@ -1,7 +1,7 @@
 import { promises as dns } from 'node:dns';
 import net from 'node:net';
 import { randomBytes } from 'node:crypto';
-import type { B2BLead, EmailStatus } from '../core/types/lead.entity.js';
+import type { VestraLead, EmailStatus } from '../core/types/lead.entity.js';
 import type { EnrichContext, IEnricher, LeadPatch } from '../core/types/enricher.interface.js';
 
 const DISPOSABLE = new Set([
@@ -45,11 +45,11 @@ export class EmailVerifier implements IEnricher {
     this.timeout = options.timeoutMs ?? 8000;
   }
 
-  supports(lead: B2BLead): boolean {
+  supports(lead: VestraLead): boolean {
     return Boolean(lead.email || lead.emails.length || lead.contacts.some((c) => c.emailDirect));
   }
 
-  async enrich(lead: B2BLead, ctx: EnrichContext): Promise<LeadPatch> {
+  async enrich(lead: VestraLead, ctx: EnrichContext): Promise<LeadPatch> {
     const log = ctx.logger.child(this.name);
     const targets = new Set<string>(
       [lead.email, ...lead.emails, ...lead.contacts.map((c) => c.emailDirect)].filter(
@@ -110,20 +110,21 @@ export class EmailVerifier implements IEnricher {
   private checkDomain(domain: string): Promise<DomainCheck> {
     let cached = this.domainCache.get(domain);
     if (!cached) {
-      cached = (async (): Promise<DomainCheck> => {
-        const mx = await dns.resolveMx(domain).catch(() => [] as { exchange: string; priority: number }[]);
-        if (mx.length === 0) return { hasMx: false };
-        const mxHost = mx.sort((a, b) => a.priority - b.priority)[0]!.exchange;
-        let catchAll: boolean | undefined;
-        if (this.smtpProbe) {
-          const probe = `${randomBytes(12).toString('hex')}@${domain}`;
-          catchAll = (await this.smtpRcpt(mxHost, probe).catch(() => false)) || undefined;
-        }
-        return { hasMx: true, mxHost, catchAll };
-      })();
+      cached = this.resolveDomain(domain);
       this.domainCache.set(domain, cached);
     }
     return cached;
+  }
+
+  private async resolveDomain(domain: string): Promise<DomainCheck> {
+    const mx = await dns.resolveMx(domain).catch(() => [] as { exchange: string; priority: number }[]);
+    if (mx.length === 0) return { hasMx: false };
+    const mxHost = [...mx].sort((a, b) => a.priority - b.priority)[0]!.exchange;
+    if (!this.smtpProbe) return { hasMx: true, mxHost };
+    const probe = `${randomBytes(12).toString('hex')}@${domain}`;
+    const accepted = await this.smtpRcpt(mxHost, probe).catch(() => undefined as boolean | undefined);
+    if (accepted === undefined) return { hasMx: true, mxHost };
+    return { hasMx: true, mxHost, catchAll: accepted };
   }
 
   /** Opens a minimal SMTP session and returns the `RCPT TO` acceptance. */

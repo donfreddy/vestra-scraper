@@ -19,7 +19,7 @@ const COUNTRY_WORDS = new Set(['cameroun', 'cameroon', 'nigeria', 'gabon', 'tcha
 /** "4,3" | "4.3 stars" -> 4.3 */
 export function parseRating(text: string | undefined): number | undefined {
   if (!text) return undefined;
-  const m = text.replace(',', '.').match(/\d+(\.\d+)?/);
+  const m = new RegExp(/\d+(\.\d+)?/).exec(text.replace(',', '.'));
   if (!m) return undefined;
   const value = Number.parseFloat(m[0]);
   return value >= 0 && value <= 5 ? value : undefined;
@@ -28,7 +28,7 @@ export function parseRating(text: string | undefined): number | undefined {
 /** "(1 234)" | "1,234 reviews" | "1 234" -> 1234 */
 export function parseReviews(text: string | undefined): number | undefined {
   if (!text) return undefined;
-  const digits = text.replace(/[^\d]/g, '');
+  const digits = text.replace(/\D/g, '');
   if (!digits) return undefined;
   const value = Number.parseInt(digits, 10);
   return Number.isFinite(value) ? value : undefined;
@@ -58,7 +58,7 @@ export function extractCityFromAddress(address: string | undefined): string | un
 /** `/maps/place/...!3d<lat>!4d<lng>` -> coordinates. */
 export function parseLatLngFromUrl(url: string | undefined): { latitude?: number; longitude?: number } {
   if (!url) return {};
-  const m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ?? url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  const m = new RegExp(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/).exec(url) ?? new RegExp(/@(-?\d+\.\d+),(-?\d+\.\d+)/).exec(url);
   if (!m) return {};
   return { latitude: Number.parseFloat(m[1]!), longitude: Number.parseFloat(m[2]!) };
 }

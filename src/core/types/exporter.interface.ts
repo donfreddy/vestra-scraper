@@ -1,4 +1,4 @@
-import type { B2BLead } from './lead.entity.js';
+import type { VestraLead } from './lead.entity.js';
 
 /**
  * Lead persistence target. The streaming mode (`open`/`write`/`close`)
@@ -9,7 +9,7 @@ export interface ILeadExporter {
   /** Preparation (file open, connection, headers...). */
   open(): Promise<void>;
   /** Persists a validated lead. Can be called many times. */
-  write(lead: B2BLead): Promise<void>;
+  write(lead: VestraLead): Promise<void>;
   /** Finalization (flush, close, returns a readable summary). */
   close(): Promise<ExporterResult>;
 }

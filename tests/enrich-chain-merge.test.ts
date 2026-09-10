@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { detectChains } from '../src/enrichers/chain.js';
-import { applyPatch } from '../src/core/pipeline/merge.js';
-import { normalizeLead } from '../src/core/pipeline/pipeline.js';
+import { detectChains } from '../src/index.js';
+import { applyPatch } from '../src/index.js';
+import { normalizeLead } from '../src/index.js';
 
 const lead = (over: Partial<Parameters<typeof normalizeLead>[0]> = {}) =>
   normalizeLead({ source: 'google-maps', companyName: 'X', city: 'Douala', ...over });

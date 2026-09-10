@@ -1,8 +1,8 @@
-import { extname } from 'node:path';
-import type { ExportFormat, ILeadExporter } from '../types/exporter.interface.js';
-import { JsonExporter } from './json.exporter.js';
-import { CsvExporter } from './csv.exporter.js';
-import { ExcelExporter } from './excel.exporter.js';
+import {extname} from 'node:path';
+import type {ExportFormat, ILeadExporter} from '../types/exporter.interface.js';
+import {JsonExporter} from './json.exporter.js';
+import {CsvExporter} from './csv.exporter.js';
+import {ExcelExporter} from './excel.exporter.js';
 
 export { JsonExporter } from './json.exporter.js';
 export { CsvExporter } from './csv.exporter.js';
@@ -32,8 +32,7 @@ export function createExporter(format: ExportFormat, outputPath: string): ILeadE
     case 'excel':
       return new ExcelExporter(outputPath);
     default: {
-      const exhaustive: never = format;
-      throw new Error(`Unknown export format: ${String(exhaustive)}`);
+      throw new Error(`Unknown export format: ${String(format)}`);
     }
   }
 }

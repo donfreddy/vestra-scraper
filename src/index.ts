@@ -10,6 +10,7 @@ export { LeadPipeline, normalizeLead, buildLeadId, inferRole } from './core/pipe
 export type { PipelineStats, NormalizeOptions } from './core/pipeline/pipeline.js';
 export { Deduplicator } from './core/pipeline/deduplicator.js';
 export { applyPatch } from './core/pipeline/merge.js';
+export { CheckpointStore } from './core/pipeline/checkpoint.js';
 export { normalizePhone, toE164 } from './core/pipeline/phone-normalizer.js';
 export { normalizeCity, cityKey } from './core/pipeline/city-normalizer.js';
 
@@ -47,14 +48,14 @@ export type {
 
 export type { IScraper, ScraperQuery, ScraperContext } from './core/types/scraper.interface.js';
 export {
-  b2bLeadSchema,
+  vestraLeadSchema,
   leadContactSchema,
   socialLinksSchema,
   reviewsInsightSchema,
   ContactRole,
 } from './core/types/lead.entity.js';
 export type {
-  B2BLead,
+  VestraLead,
   LeadContact,
   RawLead,
   SocialLinks,

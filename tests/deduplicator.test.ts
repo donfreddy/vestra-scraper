@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Deduplicator } from '../src/core/pipeline/deduplicator.js';
-import { normalizeLead } from '../src/core/pipeline/pipeline.js';
+import { Deduplicator } from '../src/index.js';
+import { normalizeLead } from '../src/index.js';
 
 const lead = (over: Partial<Parameters<typeof normalizeLead>[0]> = {}) =>
   normalizeLead({ source: 'google-maps', companyName: 'Hôtel Akwa Palace', city: 'Douala', ...over });

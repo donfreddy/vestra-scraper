@@ -1,4 +1,4 @@
-import type { B2BLead } from '../core/types/lead.entity.js';
+import type { VestraLead } from '../core/types/lead.entity.js';
 import { cityKey } from '../core/pipeline/city-normalizer.js';
 
 /** Known multi-site brands (Central African hospitality + international). */
@@ -32,7 +32,7 @@ function brandKey(name: string): string {
  *  - same brand present in >= 2 distinct cities of the dataset.
  * Mutates `lead.chain` in place.
  */
-export function detectChains(leads: B2BLead[]): void {
+export function detectChains(leads: VestraLead[]): void {
   const citiesByBrand = new Map<string, Set<string>>();
   const labelByBrand = new Map<string, string>();
 

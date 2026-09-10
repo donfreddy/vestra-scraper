@@ -1,7 +1,7 @@
 import { createWriteStream, type WriteStream } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import type { B2BLead } from '../types/lead.entity.js';
+import type { VestraLead } from '../types/lead.entity.js';
 import type { ExporterResult, ILeadExporter } from '../types/exporter.interface.js';
 
 /** Writes an indented JSON array, streaming (no memory accumulation). */
@@ -21,7 +21,7 @@ export class JsonExporter implements ILeadExporter {
     this.stream.write('[\n');
   }
 
-  async write(lead: B2BLead): Promise<void> {
+  async write(lead: VestraLead): Promise<void> {
     if (!this.stream) throw new Error('JsonExporter: open() not called');
     const prefix = this.count === 0 ? '' : ',\n';
     this.stream.write(prefix + JSON.stringify(lead, null, 2).replace(/^/gm, '  '));

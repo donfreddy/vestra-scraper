@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeLead, buildLeadId, inferRole, LeadPipeline } from '../src/core/pipeline/pipeline.js';
-import { ContactRole, type RawLead } from '../src/core/types/lead.entity.js';
-import { Logger } from '../src/core/logger.js';
+import { normalizeLead, buildLeadId, inferRole, LeadPipeline } from '../src/index.js';
+import { ContactRole, type RawLead } from '../src/index.js';
+import { Logger } from '../src/index.js';
 
 describe('normalizeLead', () => {
   it('normalizes city + phone and generates a deterministic id', () => {

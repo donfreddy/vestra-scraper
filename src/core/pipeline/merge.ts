@@ -1,4 +1,4 @@
-import type { B2BLead, LeadContact } from '../types/lead.entity.js';
+import type { VestraLead, LeadContact } from '../types/lead.entity.js';
 import type { LeadPatch } from '../types/enricher.interface.js';
 
 function uniq(values: Iterable<string>): string[] {
@@ -28,8 +28,8 @@ function mergeContactList(current: LeadContact[], incoming: LeadContact[] | unde
  * Merges an enricher `LeadPatch` into a lead. Non-destructive: values already
  * present are not overwritten by empty ones.
  */
-export function applyPatch(lead: B2BLead, patch: LeadPatch, enricherName: string): B2BLead {
-  const next: B2BLead = { ...lead };
+export function applyPatch(lead: VestraLead, patch: LeadPatch, enricherName: string): VestraLead {
+  const next: VestraLead = { ...lead };
 
   if (patch.emails) next.emails = uniq([...lead.emails, ...patch.emails]);
   if (patch.phones) next.phones = uniq([...lead.phones, ...patch.phones]);

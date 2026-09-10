@@ -1,22 +1,18 @@
-import { loadConfig, type AppConfig } from './core/config.js';
-import { Logger, type LogLevel } from './core/logger.js';
-import { BrowserDriver } from './core/driver/browser.driver.js';
-import { HttpDriver } from './core/driver/http.driver.js';
-import { LeadPipeline } from './core/pipeline/pipeline.js';
-import { applyPatch } from './core/pipeline/merge.js';
-import { createExporter, resolveFormat } from './core/exporters/index.js';
-import { GoogleMapsScraper } from './scrapers/google-maps/gmaps.scraper.js';
-import {
-  createEnricher,
-  detectChains,
-  parseEnricherList,
-  type EnricherName,
-} from './enrichers/index.js';
-import { scraperQuerySchema, type IScraper, type ScraperQuery } from './core/types/scraper.interface.js';
-import type { B2BLead } from './core/types/lead.entity.js';
-import type { EnrichContext, IEnricher } from './core/types/enricher.interface.js';
-import type { ExportFormat, ExporterResult } from './core/types/exporter.interface.js';
-import type { PipelineStats } from './core/pipeline/pipeline.js';
+import {type AppConfig, loadConfig} from './core/config.js';
+import {Logger, type LogLevel} from './core/logger.js';
+import {BrowserDriver} from './core/driver/browser.driver.js';
+import {HttpDriver} from './core/driver/http.driver.js';
+import type {PipelineStats} from './core/pipeline/pipeline.js';
+import {LeadPipeline} from './core/pipeline/pipeline.js';
+import {applyPatch} from './core/pipeline/merge.js';
+import {CheckpointStore} from './core/pipeline/checkpoint.js';
+import {createExporter, resolveFormat} from './core/exporters/index.js';
+import {GoogleMapsScraper} from './scrapers/google-maps/gmaps.scraper.js';
+import {createEnricher, detectChains, type EnricherName, parseEnricherList,} from './enrichers/index.js';
+import {type IScraper, type ScraperQuery, scraperQuerySchema} from './core/types/scraper.interface.js';
+import type {VestraLead} from './core/types/lead.entity.js';
+import type {EnrichContext, IEnricher} from './core/types/enricher.interface.js';
+import type {ExporterResult, ExportFormat} from './core/types/exporter.interface.js';
 
 export type SourceName = 'google-maps' | 'gmaps';
 
@@ -36,6 +32,8 @@ export interface RunOptions {
   format?: ExportFormat;
   /** Enricher list: `"website,email"`, `"all"`, or empty for none. */
   enrich?: string;
+  /** Ignore (and reset) any existing checkpoint for this run. */
+  fresh?: boolean;
   signal?: AbortSignal;
 }
 
@@ -46,10 +44,12 @@ export interface EnrichmentSummary {
 }
 
 export interface RunResult {
-  leads: B2BLead[];
+  leads: VestraLead[];
   stats: PipelineStats;
   export: ExporterResult;
   enrichment?: EnrichmentSummary;
+  /** Leads restored from a previous interrupted run (checkpoint). */
+  resumed: number;
   durationMs: number;
 }
 
@@ -72,8 +72,7 @@ export class ScraperEngine {
       case 'gmaps':
         return new GoogleMapsScraper({ browser });
       default: {
-        const exhaustive: never = source;
-        throw new Error(`Unknown source: ${String(exhaustive)}`);
+        throw new Error(`Unknown source: ${String(source)}`);
       }
     }
   }
@@ -117,32 +116,44 @@ export class ScraperEngine {
       this.logger.child('pipeline'),
     );
 
-    const streaming = enricherNames.length === 0;
-    const leads: B2BLead[] = [];
+    const willEnrich = enricherNames.length > 0;
+    const signature = `${options.source ?? 'gmaps'}|${query.query}|${query.location}|${enricherNames.join(',')}`;
+    const checkpoint = new CheckpointStore(options.output, signature);
+    if (options.fresh) checkpoint.clear();
+    const restored = options.fresh ? new Map<string, VestraLead>() : checkpoint.load(this.logger);
+    const isDone = (l: VestraLead): boolean => !willEnrich || l.metadata?.['enrichAttempted'] === true;
 
-    if (streaming) await exporter.open();
+    const leads: VestraLead[] = [...restored.values()];
 
     try {
+      // 1. Scrape — skip places already captured by a previous run, persist each
+      //    new one immediately so an interrupted scrape isn't lost.
       const source = scraper.execute(query, { logger: this.logger, signal: options.signal });
       for await (const lead of pipeline.run(source)) {
+        if (restored.has(lead.id)) continue;
         leads.push(lead);
-        if (streaming) await exporter.write(lead);
-        this.logger.info(`✓ ${lead.companyName}${lead.city ? ` in ${lead.city}` : ''}`);
+        checkpoint.append(lead);
+        this.logger.info(`✓ ${lead.companyName}${lead.city ? ` — ${lead.city}` : ''}`);
       }
 
+      // 2. Enrich — only leads not yet attempted (fresh + partially-done runs).
       let enrichment: EnrichmentSummary | undefined;
-      if (!streaming) {
-        enrichment = await this.enrich(leads, enricherNames, browser, options.signal);
-        await exporter.open();
-        for (const lead of leads) await exporter.write(lead);
+      if (willEnrich && !options.signal?.aborted) {
+        enrichment = await this.enrich(leads, isDone, enricherNames, browser, checkpoint, options.signal);
       }
 
+      // 3. Export the full set (restored + fresh).
+      await exporter.open();
+      for (const lead of leads) await exporter.write(lead);
       const exportResult = await exporter.close();
+
+      if (!options.signal?.aborted) checkpoint.clear();
       return {
         leads,
         stats: pipeline.stats,
         export: exportResult,
         ...(enrichment ? { enrichment } : {}),
+        resumed: [...restored.values()].filter(isDone).length,
         durationMs: Date.now() - started,
       };
     } finally {
@@ -151,13 +162,20 @@ export class ScraperEngine {
   }
 
   private async enrich(
-    leads: B2BLead[],
+    leads: VestraLead[],
+    isDone: (l: VestraLead) => boolean,
     names: EnricherName[],
     browser: BrowserDriver,
+    checkpoint: CheckpointStore,
     signal: AbortSignal | undefined,
   ): Promise<EnrichmentSummary> {
     const log = this.logger.child('enrich');
-    log.info(`enrichment (${names.join(', ')}) on ${leads.length} leads`);
+    const todo = leads.map((_, i) => i).filter((i) => !isDone(leads[i]!));
+    const restoredCount = leads.length - todo.length;
+    log.info(
+      `enrichment (${names.join(', ')}) on ${todo.length} leads` +
+        (restoredCount ? ` (+${restoredCount} restored)` : ''),
+    );
 
     const enrichers: IEnricher[] = names.map((n) =>
       createEnricher(n, {
@@ -179,9 +197,9 @@ export class ScraperEngine {
     };
 
     let enriched = 0;
-    await mapPool(leads, this.config.enrichment.concurrency, async (lead, index) => {
+    await mapPool(todo, this.config.enrichment.concurrency, async (index) => {
       if (signal?.aborted) return;
-      let current = lead;
+      let current = leads[index]!;
       let touched = false;
       for (const enricher of enrichers) {
         if (!enricher.supports(current)) continue;
@@ -195,7 +213,9 @@ export class ScraperEngine {
           log.warn(`${enricher.name} failed on "${current.companyName}": ${(error as Error).message}`);
         }
       }
+      current = { ...current, metadata: { ...current.metadata, enrichAttempted: true } };
       leads[index] = current;
+      checkpoint.append(current); // persist progress for crash-resume
       if (touched) enriched += 1;
     });
 

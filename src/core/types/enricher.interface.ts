@@ -1,4 +1,4 @@
-import type { B2BLead } from './lead.entity.js';
+import type { VestraLead } from './lead.entity.js';
 import type { HttpDriver } from '../driver/http.driver.js';
 import type { BrowserDriver } from '../driver/browser.driver.js';
 import type { Logger } from '../logger.js';
@@ -6,7 +6,7 @@ import type { Logger } from '../logger.js';
 /** Lead fragment returned by an enricher, merged into the original lead. */
 export type LeadPatch = Partial<
   Pick<
-    B2BLead,
+    VestraLead,
     | 'email'
     | 'emails'
     | 'phones'
@@ -39,6 +39,6 @@ export interface EnrichContext {
 export interface IEnricher {
   readonly name: string;
   /** `false` => lead ignored by this enricher (e.g. no website). */
-  supports(lead: B2BLead): boolean;
-  enrich(lead: B2BLead, ctx: EnrichContext): Promise<LeadPatch>;
+  supports(lead: VestraLead): boolean;
+  enrich(lead: VestraLead, ctx: EnrichContext): Promise<LeadPatch>;
 }

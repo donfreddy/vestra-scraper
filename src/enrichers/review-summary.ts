@@ -65,7 +65,7 @@ export async function summarizeReviews(reviews: RawReview[], options: SummarizeO
 }
 
 export function parseSummary(text: string): ReviewSummary {
-  const match = text.match(/\{[\s\S]*\}/);
+  const match = new RegExp(/\{[\s\S]*}/).exec(text);
   if (!match) throw new Error('unparseable LLM response');
   const parsed = JSON.parse(match[0]) as Partial<ReviewSummary>;
 
@@ -78,7 +78,7 @@ export function parseSummary(text: string): ReviewSummary {
     summary: (parsed.summary ?? '').trim(),
     sentiment,
     highlights: Array.isArray(parsed.highlights)
-      ? parsed.highlights.filter((h): h is string => typeof h === 'string').slice(0, 5)
+      ? parsed.highlights.filter((h): h is string => true).slice(0, 5)
       : [],
   };
 }

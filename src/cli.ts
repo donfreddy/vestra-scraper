@@ -31,6 +31,7 @@ program
     '-e, --enrich <list>',
     'Enrichment: "website", "email", "reviews", comma-separated, or "all"',
   )
+  .option('--fresh', 'Ignore any existing checkpoint and restart from scratch')
   .addOption(
     new Option('--log-level <level>', 'Verbosity')
       .choices(['debug', 'info', 'warn', 'error', 'silent'])
@@ -61,12 +62,15 @@ program
         country: opts.country,
         limit: Number.parseInt(opts.limit, 10) || 0,
         ...(opts.enrich ? { enrich: opts.enrich as string } : {}),
+        ...(opts.fresh ? { fresh: true } : {}),
         signal: controller.signal,
       });
 
       spinner.stop();
       const s = result.stats;
-      console.error(chalk.green(`\n  ✓ ${s.accepted} leads exported`) + chalk.gray(` (${result.export.location})`));
+      console.error(
+        chalk.green(`\n  ✓ ${result.leads.length} leads exported`) + chalk.gray(` (${result.export.location})`),
+      );
       console.error(
         chalk.gray(
           `    received ${s.received} · duplicates ${s.duplicates} · invalid ${s.invalid} · ${(
@@ -75,11 +79,14 @@ program
           ).toFixed(1)}s`,
         ),
       );
+      if (result.resumed > 0) {
+        console.error(chalk.gray(`    (incl. ${result.resumed} restored from an interrupted run)`));
+      }
       if (result.enrichment) {
         const e = result.enrichment;
         console.error(
           chalk.gray(
-            `    enriched ${e.leadsEnriched}/${s.accepted} via ${e.enrichers.join('+')} · chains ${e.chainsDetected}`,
+            `    enriched ${e.leadsEnriched}/${result.leads.length} via ${e.enrichers.join('+')} · chains ${e.chainsDetected}`,
           ),
         );
       }

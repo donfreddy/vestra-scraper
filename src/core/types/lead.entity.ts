@@ -53,7 +53,7 @@ export const reviewsInsightSchema = z.object({
 });
 export type ReviewsInsight = z.infer<typeof reviewsInsightSchema>;
 
-export const b2bLeadSchema = z.object({
+export const vestraLeadSchema = z.object({
   /** Stable and deterministic identifier (see `buildLeadId`). */
   id: z.string().min(1),
   source: z.string().min(1),
@@ -97,10 +97,10 @@ export const b2bLeadSchema = z.object({
   scrapedAt: z.coerce.date().default(() => new Date()),
 });
 
-export type B2BLead = z.infer<typeof b2bLeadSchema>;
+export type VestraLead = z.infer<typeof vestraLeadSchema>;
 
 /** Raw shape accepted before validation/normalization by the pipeline. */
-export type RawLead = Partial<Omit<B2BLead, 'contacts' | 'metadata'>> & {
+export type RawLead = Partial<Omit<VestraLead, 'contacts' | 'metadata'>> & {
   companyName: string;
   source: string;
   contacts?: Array<Partial<LeadContact> & { fullName: string }>;

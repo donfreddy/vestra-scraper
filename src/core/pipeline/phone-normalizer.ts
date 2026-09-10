@@ -15,7 +15,7 @@ export interface NormalizedPhone {
  * `defaultCountry` is used as a fallback when the number has no country code.
  */
 export function normalizePhone(raw: string | undefined, defaultCountry = 'CM'): NormalizedPhone {
-  if (!raw || !raw.trim()) return { valid: false };
+  if (!raw?.trim()) return { valid: false };
 
   // A single field can contain several numbers ("+237 6xx / 2xx"). We take the first.
   const firstChunk = raw.split(/[/;]|(?:\s{2,})/)[0]?.trim() ?? raw.trim();

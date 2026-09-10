@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeCity, cityKey } from '../src/core/pipeline/city-normalizer.js';
+import { normalizeCity, cityKey } from '../src/index.js';
 
 describe('normalizeCity', () => {
   it('canonicalizes known variants', () => {

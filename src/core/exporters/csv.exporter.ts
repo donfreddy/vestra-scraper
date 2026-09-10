@@ -2,7 +2,7 @@ import { createWriteStream, type WriteStream } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { stringify, type Stringifier } from 'csv-stringify';
-import type { B2BLead } from '../types/lead.entity.js';
+import type { VestraLead } from '../types/lead.entity.js';
 import type { ExporterResult, ILeadExporter } from '../types/exporter.interface.js';
 import { LEAD_COLUMNS, flattenLead } from './flatten.js';
 
@@ -30,7 +30,7 @@ export class CsvExporter implements ILeadExporter {
     this.stringifier.pipe(this.fileStream);
   }
 
-  async write(lead: B2BLead): Promise<void> {
+  async write(lead: VestraLead): Promise<void> {
     if (!this.stringifier) throw new Error('CsvExporter: open() not called');
     this.stringifier.write(flattenLead(lead));
     this.count += 1;

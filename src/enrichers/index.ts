@@ -1,7 +1,7 @@
-import type { IEnricher } from '../core/types/enricher.interface.js';
-import { WebsiteEnricher } from './website.enricher.js';
-import { EmailVerifier } from './email-verifier.js';
-import { ReviewsEnricher } from './reviews.enricher.js';
+import type {IEnricher} from '../core/types/enricher.interface.js';
+import {WebsiteEnricher} from './website.enricher.js';
+import {EmailVerifier} from './email-verifier.js';
+import {ReviewsEnricher} from './reviews.enricher.js';
 
 export { WebsiteEnricher } from './website.enricher.js';
 export { EmailVerifier } from './email-verifier.js';
@@ -28,8 +28,7 @@ export function createEnricher(name: EnricherName, options: EnricherFactoryOptio
     case 'reviews':
       return new ReviewsEnricher();
     default: {
-      const exhaustive: never = name;
-      throw new Error(`Unknown enricher: ${String(exhaustive)}`);
+      throw new Error(`Unknown enricher: ${String(name)}`);
     }
   }
 }

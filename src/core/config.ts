@@ -53,7 +53,12 @@ let cached: AppConfig | undefined;
 export function loadConfig(overrides: Partial<NodeJS.ProcessEnv> = {}): AppConfig {
   if (cached && Object.keys(overrides).length === 0) return cached;
 
-  const parsed = envSchema.parse({ ...process.env, ...overrides });
+  // Treat empty-string env vars (`KEY=` in .env) as absent so defaults apply.
+  const merged = { ...process.env, ...overrides };
+  for (const key of Object.keys(merged)) {
+    if (merged[key] === '') delete merged[key];
+  }
+  const parsed = envSchema.parse(merged);
   const config: AppConfig = {
     headless: parsed.HEADLESS,
     browserLocale: parsed.BROWSER_LOCALE,

@@ -10,7 +10,12 @@ export interface GoogleMapsScraperOptions {
   scrollIdleMs?: number;
   /** Max number of scroll cycles (safety guard). */
   maxScrolls?: number;
+  /** Randomized pause between place visits (anti-blocking), in ms. */
+  minDelayMs?: number;
+  maxDelayMs?: number;
 }
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 const CONSENT_SELECTORS = [
   'button[aria-label*="Tout accepter"]',
@@ -20,7 +25,7 @@ const CONSENT_SELECTORS = [
 ];
 
 /** Extraction body executed in the page context (string = not transpiled). */
-const PLACE_EXTRACTION_JS = `(() => {
+const PLACE_EXTRACTION_JS = String.raw`(() => {
   const text = (sel) => { const el = document.querySelector(sel); return (el && el.textContent ? el.textContent.trim() : '') || undefined; };
   const attr = (sel, name) => { const el = document.querySelector(sel); return (el && el.getAttribute(name)) || undefined; };
 
@@ -41,11 +46,19 @@ const PLACE_EXTRACTION_JS = `(() => {
     || (document.querySelector('button[aria-label*="avis"]') || {}).ariaLabel
     || undefined;
 
-  const address = ((attr('button[data-item-id="address"]', 'aria-label') || '').replace(/^Adresse:\\s*/i, ''))
+  const address = ((attr('button[data-item-id="address"]', 'aria-label') || '').replace(/^Adresse:\s*/i, ''))
     || text('button[data-item-id="address"]') || undefined;
 
-  let category = text('button[jsaction*="category"]') || text('[jsaction*="category"]') || undefined;
-  if (category && /^(ajouter|add|suggest|modifier|claim|revendiquer)/i.test(category)) category = undefined;
+  const isAction = (t) => !t || t.length > 40 || /^(ajouter|add|suggest|modifier|claim|revendiquer|propose|edit|write a review|rédiger)/i.test(t);
+  let category = text('button[jsaction*="category"]');
+  if (isAction(category)) {
+    category = undefined;
+    const cands = document.querySelectorAll('button.DkEaL, [jsaction*="category"], button[jsaction*="pane.rating.category"]');
+    for (let i = 0; i < cands.length; i++) {
+      const t = (cands[i].textContent || '').trim();
+      if (!isAction(t)) { category = t; break; }
+    }
+  }
 
   return {
     name: name,
@@ -70,10 +83,14 @@ export class GoogleMapsScraper implements IScraper {
   readonly name = 'google-maps';
   private readonly scrollIdleMs: number;
   private readonly maxScrolls: number;
+  private readonly minDelayMs: number;
+  private readonly maxDelayMs: number;
 
   constructor(private readonly options: GoogleMapsScraperOptions) {
     this.scrollIdleMs = options.scrollIdleMs ?? 3000;
     this.maxScrolls = options.maxScrolls ?? 60;
+    this.minDelayMs = options.minDelayMs ?? 400;
+    this.maxDelayMs = Math.max(this.minDelayMs, options.maxDelayMs ?? 1200);
   }
 
   async *execute(query: ScraperQuery, ctx: ScraperContext): AsyncIterable<RawLead> {
@@ -115,6 +132,10 @@ export class GoogleMapsScraper implements IScraper {
       }
       if (query.limit && done >= query.limit) return;
 
+      if (done > 0) {
+        await sleep(this.minDelayMs + Math.random() * (this.maxDelayMs - this.minDelayMs));
+      }
+
       try {
         const place = await this.options.browser.withPage(async (page) => {
           await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -134,7 +155,7 @@ export class GoogleMapsScraper implements IScraper {
 
   private buildSearchUrl(query: ScraperQuery): string {
     const term = `${query.query} ${query.location}`.replace(/\s+/g, '+');
-    return `https://www.google.com/maps/search/${encodeURIComponent(term).replace(/%2B/g, '+')}?hl=fr`;
+    return `https://www.google.com/maps/search/${encodeURIComponent(term).replaceAll('%2B', '+')}?hl=fr`;
   }
 
   private async dismissConsent(page: Page): Promise<void> {

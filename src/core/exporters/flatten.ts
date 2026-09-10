@@ -1,4 +1,4 @@
-import type { B2BLead } from '../types/lead.entity.js';
+import type { VestraLead } from '../types/lead.entity.js';
 
 /** Deliverable columns, in order, with readable headers. */
 export const LEAD_COLUMNS = [
@@ -35,7 +35,7 @@ export const LEAD_COLUMNS = [
 export type FlatLead = Record<(typeof LEAD_COLUMNS)[number][0], string | number>;
 
 /** Flattens a lead: the most reliable contact is lifted onto the row. */
-export function flattenLead(lead: B2BLead): FlatLead {
+export function flattenLead(lead: VestraLead): FlatLead {
   const best = [...lead.contacts].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
   return {
     companyName: lead.companyName,

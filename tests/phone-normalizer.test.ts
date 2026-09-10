@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePhone, toE164 } from '../src/core/pipeline/phone-normalizer.js';
+import { normalizePhone, toE164 } from '../src/index.js';
 
 describe('normalizePhone (Cameroun)', () => {
   it('adds the country code to a 9-digit national number', () => {

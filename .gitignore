@@ -19,6 +19,9 @@ node_modules
 # Build
 dist
 
+# Resume checkpoints
+.vestra-cache
+
 # Env
 .env
 .env.local
