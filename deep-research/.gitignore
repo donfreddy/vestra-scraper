@@ -1,0 +1,22 @@
+node_modules
+dist
+
+# Yarn (Berry, node-modules linker)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Env
+.env
+.env.local
+
+# Sorties
+out
+output-*.json
+
+*.log
+.DS_Store

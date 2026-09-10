@@ -1,0 +1,36 @@
+{
+  "name": "hotel-deep-research",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enrichit une liste d'hôtels (propriétaire, direction, quartier, BP, géoloc…) via recherche web LLM (Gemini) et pousse le résultat dans Notion.",
+  "type": "module",
+  "bin": {
+    "research": "./src/cli.ts"
+  },
+  "scripts": {
+    "cli": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "@notionhq/client": "^2.3.0",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "libphonenumber-js": "^1.11.9",
+    "p-retry": "^6.2.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.0"
+  },
+  "packageManager": "yarn@4.12.0"
+}
