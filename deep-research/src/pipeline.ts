@@ -32,12 +32,16 @@ export function toRecord(
   sources: string[],
   model: string,
   threshold: number,
+  searchUsed = true,
 ): HotelRecord {
   const owner = clean(g.owner);
   const management = clean(g.management);
-  const confidence = g.governance_confidence ?? (owner || management ? 0.4 : 0);
+  // Sans recherche web, la donnée n'est jamais vérifiée : plafond de confiance
+  // et statut « à vérifier » systématique.
+  const rawConfidence = g.governance_confidence ?? (owner || management ? 0.4 : 0);
+  const confidence = searchUsed ? rawConfidence : Math.min(rawConfidence, 0.4);
   const status: HotelRecord['status'] =
-    !owner && !management ? 'needs_review' : confidence < threshold ? 'needs_review' : 'auto';
+    !searchUsed || (!owner && !management) || confidence < threshold ? 'needs_review' : 'auto';
 
   const phone = clean(g.phone);
   return hotelRecordSchema.parse({
@@ -120,7 +124,14 @@ export async function runEnrichment(
         maxRetries: config.maxRetries,
         search: config.geminiSearch,
       });
-      const record = toRecord(task, data, sources, config.geminiModel, config.reviewConfidenceThreshold);
+      const record = toRecord(
+        task,
+        data,
+        sources,
+        config.geminiModel,
+        config.reviewConfidenceThreshold,
+        config.geminiSearch,
+      );
       store.upsert(record);
       s.enriched += 1;
       if (record.status === 'needs_review') s.needsReview += 1;

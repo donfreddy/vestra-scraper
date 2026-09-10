@@ -68,4 +68,17 @@ describe('toRecord', () => {
     const r = toRecord(task, { owner: 'X', governance_confidence: 0.9 }, ['not-a-url', 'https://ok.cm'], 'm', 0.6);
     expect(r.sources).toEqual(['https://ok.cm']);
   });
+
+  it('forces needs_review and caps confidence when search was not used', () => {
+    const r = toRecord(
+      task,
+      { owner: 'Groupe X', management: 'M. Y', governance_confidence: 0.95 },
+      [],
+      'm',
+      0.6,
+      false,
+    );
+    expect(r.status).toBe('needs_review');
+    expect(r.governanceConfidence).toBeLessThanOrEqual(0.4);
+  });
 });
