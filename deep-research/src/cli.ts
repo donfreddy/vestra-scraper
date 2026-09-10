@@ -71,8 +71,14 @@ program
 
     console.error(
       chalk.bold.cyan(`\n  research enrich — ${tasks.length} hôtels`) +
-        chalk.gray(`  (modèle ${config.geminiModel}${notion ? ', → Notion' : ', local seulement'})\n`),
+        chalk.gray(`  (${config.geminiModel}${notion ? ', → Notion' : ', local'})`),
     );
+    if (!config.geminiSearch) {
+      console.error(
+        chalk.yellow('  ⚠ GEMINI_SEARCH=false : réponses issues des connaissances du modèle, sans sources web (moins fiable)'),
+      );
+    }
+    console.error('');
 
     try {
       const s = await runEnrichment(ai, config, {

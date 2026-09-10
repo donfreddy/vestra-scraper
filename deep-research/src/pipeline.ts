@@ -118,6 +118,7 @@ export async function runEnrichment(
       const { data, sources } = await enrichHotel(ai, task, {
         model: config.geminiModel,
         maxRetries: config.maxRetries,
+        search: config.geminiSearch,
       });
       const record = toRecord(task, data, sources, config.geminiModel, config.reviewConfidenceThreshold);
       store.upsert(record);

@@ -3,9 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 
+const boolish = z
+  .union([z.boolean(), z.string()])
+  .transform((v) => (typeof v === 'boolean' ? v : !/^(0|false|no|off)$/i.test(v.trim())));
+
 const schema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_SEARCH: boolish.default(true),
   NOTION_API_KEY: z.string().min(1).optional(),
   NOTION_DATABASE_ID: z.string().min(1).optional(),
   REQUEST_INTERVAL_MS: z.coerce.number().int().nonnegative().default(4500),
@@ -16,6 +21,7 @@ const schema = z.object({
 export interface AppConfig {
   geminiApiKey?: string;
   geminiModel: string;
+  geminiSearch: boolean;
   notionApiKey?: string;
   notionDatabaseId?: string;
   requestIntervalMs: number;
@@ -32,6 +38,7 @@ export function loadConfig(): AppConfig {
   return {
     geminiApiKey: p.GEMINI_API_KEY,
     geminiModel: p.GEMINI_MODEL,
+    geminiSearch: p.GEMINI_SEARCH,
     notionApiKey: p.NOTION_API_KEY,
     notionDatabaseId: p.NOTION_DATABASE_ID,
     requestIntervalMs: p.REQUEST_INTERVAL_MS,

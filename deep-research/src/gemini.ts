@@ -9,6 +9,8 @@ export function createGemini(apiKey: string): GoogleGenAI {
 interface CallOptions {
   model: string;
   maxRetries: number;
+  /** Utiliser Google Search grounding (nécessite le tier payant Gemini pour certains modèles). */
+  search: boolean;
 }
 
 export interface EnrichResult {
@@ -37,17 +39,42 @@ function collectSources(response: unknown): string[] {
   return [...urls].slice(0, 8);
 }
 
+function errorText(error: unknown): string {
+  return String((error as Error)?.message ?? error).toLowerCase();
+}
+
+/** 429 lié au plan/facturation (ne se résoudra pas en retentant) vs simple rate-limit RPM. */
+function isQuotaExhausted(error: unknown): boolean {
+  const status = (error as { status?: number }).status;
+  const msg = errorText(error);
+  if (status !== 429 && !/resource_exhausted|429/.test(msg)) return false;
+  return /billing|check your plan|current quota|per day|daily|free tier/.test(msg);
+}
+
 function isPermanent(error: unknown): boolean {
-  const msg = String((error as Error)?.message ?? error).toLowerCase();
+  const msg = errorText(error);
   const status = (error as { status?: number }).status;
   if (status === 400 || status === 401 || status === 403 || status === 404) return true;
+  if (isQuotaExhausted(error)) return true;
   return /api key|permission|invalid argument|unauthenticated/.test(msg);
 }
 
-async function callWithSearch(
+function friendlyError(error: unknown, searchOn: boolean): Error {
+  if (isQuotaExhausted(error)) {
+    const hint = searchOn
+      ? "Quota Gemini dépassé. Le Google Search grounding n'est pas couvert par le tier gratuit sur ce modèle. " +
+        'Options : activer la facturation sur ton projet Google AI, OU mettre GEMINI_SEARCH=false dans .env ' +
+        "(recherche via les connaissances du modèle seulement, sans sources — moins fiable)."
+      : 'Quota Gemini dépassé (requêtes/jour du tier gratuit). Réessaie demain ou active la facturation.';
+    return new Error(hint);
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function callGemini(
   ai: GoogleGenAI,
   prompt: string,
-  { model, maxRetries }: CallOptions,
+  { model, maxRetries, search }: CallOptions,
 ): Promise<{ text: string; sources: string[] }> {
   return pRetry(
     async () => {
@@ -55,17 +82,20 @@ async function callWithSearch(
         const response = await ai.models.generateContent({
           model,
           contents: prompt,
-          config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+          config: {
+            temperature: 0.2,
+            ...(search ? { tools: [{ googleSearch: {} }] } : {}),
+          },
         });
         const text = response.text ?? '';
         if (!text.trim()) throw new Error('réponse Gemini vide');
-        return { text, sources: collectSources(response) };
+        return { text, sources: search ? collectSources(response) : [] };
       } catch (error) {
-        if (isPermanent(error)) throw new AbortError(error instanceof Error ? error : new Error(String(error)));
+        if (isPermanent(error)) throw new AbortError(friendlyError(error, search));
         throw error;
       }
     },
-    { retries: maxRetries, minTimeout: 3000, factor: 2, randomize: true },
+    { retries: maxRetries, minTimeout: 5000, factor: 2, randomize: true },
   );
 }
 
@@ -101,7 +131,7 @@ Règles :
 - Si une information est réellement introuvable, mets null (n'invente jamais un nom de propriétaire ou de directeur).
 - governance_confidence doit refléter honnêtement la fiabilité de tes sources pour owner et management (0 = pure supposition, 1 = source officielle explicite).`;
 
-  const { text, sources } = await callWithSearch(ai, prompt, opts);
+  const { text, sources } = await callGemini(ai, prompt, opts);
   const data = geminiHotelSchema.parse(extractJson(text));
   return { data, sources };
 }
@@ -122,7 +152,7 @@ export async function discoverHotels(
 Renvoie UNIQUEMENT un objet JSON valide : { "hotels": ["Nom officiel 1", "Nom officiel 2", ...] }
 - Uniquement les noms officiels exacts, sans doublon, sans les résidences purement privées.`;
 
-  const { text, sources } = await callWithSearch(ai, prompt, opts);
+  const { text, sources } = await callGemini(ai, prompt, opts);
   const parsed = extractJson(text) as { hotels?: unknown };
   const hotels = Array.isArray(parsed.hotels)
     ? parsed.hotels.filter((h): h is string => typeof h === 'string' && h.trim().length > 1).map((h) => h.trim())

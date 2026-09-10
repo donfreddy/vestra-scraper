@@ -33,6 +33,7 @@ export async function runDiscovery(
     const { hotels } = await discoverHotels(ai, city, country, {
       model: config.geminiModel,
       maxRetries: config.maxRetries,
+      search: config.geminiSearch,
     });
     result[city] = { country, hotels };
     console.error(chalk.green(`   ${hotels.length} hôtels trouvés`));

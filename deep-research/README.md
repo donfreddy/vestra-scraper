@@ -96,8 +96,22 @@ crée pas de doublons.
 
 ## Durée / quota
 
-~1 requête Gemini par hôtel + pause `REQUEST_INTERVAL_MS` (défaut 4,5 s, sous la limite
-free tier). ~100 hôtels ≈ 8–10 min. `discover` consomme 1 requête par ville.
+~1 requête Gemini par hôtel + pause `REQUEST_INTERVAL_MS` (défaut 4,5 s). ~100 hôtels
+≈ 8–10 min. `discover` consomme 1 requête par ville.
+
+### Erreur 429 / « quota dépassé » dès le 1ᵉʳ appel
+
+Le **Google Search grounding** (`GEMINI_SEARCH=true`) n'est en général **pas couvert par
+le tier gratuit** — d'où un 429 immédiat. Trois options :
+
+1. **Activer la facturation** sur le projet Google AI (pay-as-you-go). Le grounding coûte
+   ~35 $/1000 requêtes → ~3,5 $ pour 100 hôtels. C'est l'option qui donne les vraies sources.
+2. **`GEMINI_SEARCH=false`** dans `.env` : le modèle répond de mémoire. Marche sur le free
+   tier, plus rapide, **mais sans sources et plus sujet à hallucination** — à réserver au
+   dégrossissage, tout passe en `À vérifier`.
+3. Attendre 24 h si c'est le quota **journalier** de requêtes qui est atteint (pas le grounding).
+
+Pour tester sans consommer : `GEMINI_SEARCH=false yarn cli enrich -i hotels.json --limit 1`.
 
 ## Limites
 
