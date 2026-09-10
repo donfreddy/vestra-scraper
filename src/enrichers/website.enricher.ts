@@ -53,15 +53,22 @@ export class WebsiteEnricher implements IEnricher {
     const contacts = new Map<string, ReturnType<typeof leadContactSchema.parse>>();
 
     let visited = 0;
+    let attempts = 0;
     for (const path of CANDIDATE_PATHS) {
-      if (visited >= this.maxPages || ctx.signal?.aborted) break;
+      // Budget both successes and failures so a dead/parked domain can't burn
+      // dozens of requests across every candidate path.
+      if (visited >= this.maxPages || attempts >= this.maxPages + 2 || ctx.signal?.aborted) break;
       const url = new URL(path, base).toString();
 
+      attempts += 1;
       let $: CheerioAPI;
       try {
         $ = await ctx.http.getDom(url);
       } catch (error) {
-        if (path === '') log.debug(`site unreachable: ${(error as Error).message}`);
+        if (path === '') {
+          log.debug(`homepage unreachable, skipping site: ${(error as Error).message}`);
+          break; // no homepage => the rest of the paths are pointless
+        }
         continue;
       }
       visited += 1;

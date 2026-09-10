@@ -78,7 +78,7 @@ export class HttpDriver {
           onRetry: (err, attempt) => {
             const status = (err as { response?: { statusCode?: number } }).response?.statusCode;
             this.log.warn(
-              `blocked/error (${status ?? (err as { code?: string }).code ?? 'unknown'}) on ${url}, attempt ${attempt}/${this.retryOpts.retries}`,
+              `blocked/error (${status ?? (err as { code?: string }).code ?? 'unknown'}) on ${url}, retry ${attempt}/${this.retryOpts.retries}`,
             );
           },
         },

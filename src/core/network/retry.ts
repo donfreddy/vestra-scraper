@@ -20,7 +20,8 @@ export function isRetryableError(error: unknown): boolean {
   const e = error as HttpErrorLike;
   const status = e?.response?.statusCode;
   if (typeof status === 'number' && RETRYABLE_STATUS.has(status)) return true;
-  const transientCodes = ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EAI_AGAIN', 'ENOTFOUND'];
+  // Note: ENOTFOUND (domain does not resolve) is permanent — do not retry it.
+  const transientCodes = ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EAI_AGAIN', 'EPIPE'];
   return typeof e?.code === 'string' && transientCodes.includes(e.code);
 }
 
@@ -47,7 +48,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions):
       minTimeout: options.baseDelayMs,
       randomize: true,
       onFailedAttempt: (err) => {
-        options.onRetry?.(err, err.attemptNumber);
+        if (err.retriesLeft > 0) options.onRetry?.(err, err.attemptNumber);
       },
     },
   );
