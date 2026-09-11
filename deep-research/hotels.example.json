@@ -1,0 +1,27 @@
+{
+  "Douala": {
+    "country": "Cameroun",
+    "hotels": [
+      "Hôtel La Falaise Bonapriso",
+      "Krystal Palace Douala",
+      "Hôtel Sawa",
+      "Star Land Hotel Bonapriso",
+      "Akwa Palace"
+    ]
+  },
+  "Yaoundé": {
+    "country": "Cameroun",
+    "hotels": [
+      "Hilton Yaoundé",
+      "Hôtel Mont Fébé",
+      "Djeuga Palace Hotel"
+    ]
+  },
+  "Abidjan": {
+    "country": "Côte d'Ivoire",
+    "hotels": [
+      "Sofitel Abidjan Hôtel d'Ivoire",
+      "Noom Hotel Abidjan Plateau"
+    ]
+  }
+}
