@@ -1,7 +1,8 @@
 import chalk from 'chalk';
 import type { GoogleGenAI } from '@google/genai';
 import type { AppConfig } from './config.js';
-import { enrichHotel } from './gemini.js';
+import { enrichHotelFromContext, enrichHotelGrounded, type EnrichResult } from './gemini.js';
+import { buildWebContext } from './websearch.js';
 import { toE164 } from './phone.js';
 import { hotelSlug } from './slug.js';
 import { RecordStore } from './store.js';
@@ -69,6 +70,24 @@ export function toRecord(
   });
 }
 
+/** Enrichit un hôtel selon le fournisseur de recherche configuré. */
+async function enrichOne(ai: GoogleGenAI, task: HotelTask, config: AppConfig): Promise<EnrichResult> {
+  const opts = { model: config.geminiModel, maxRetries: config.maxRetries };
+
+  if (config.searchProvider === 'google') {
+    return enrichHotelGrounded(ai, task, opts);
+  }
+  if (config.searchProvider === 'duckduckgo') {
+    const context = await buildWebContext(task, {
+      maxResults: config.searchMaxResults,
+      fetchPages: config.searchFetchPages,
+    });
+    return enrichHotelFromContext(ai, task, context, opts);
+  }
+  // 'none' : pas de recherche, réponse (prudente) issue des seules connaissances du modèle.
+  return enrichHotelFromContext(ai, task, { text: '', sources: [] }, opts);
+}
+
 export interface RunOptions {
   tasks: HotelTask[];
   store: RecordStore;
@@ -119,19 +138,11 @@ export async function runEnrichment(
     }
 
     try {
-      const { data, sources } = await enrichHotel(ai, task, {
-        model: config.geminiModel,
-        maxRetries: config.maxRetries,
-        search: config.geminiSearch,
-      });
-      const record = toRecord(
-        task,
-        data,
-        sources,
-        config.geminiModel,
-        config.reviewConfidenceThreshold,
-        config.geminiSearch,
-      );
+      const { data, sources } = await enrichOne(ai, task, config);
+      // On ne fait confiance à la gouvernance que si on a effectivement des
+      // sources exploitables (peu importe le fournisseur).
+      const searchUsed = sources.length > 0;
+      const record = toRecord(task, data, sources, config.geminiModel, config.reviewConfidenceThreshold, searchUsed);
       store.upsert(record);
       s.enriched += 1;
       if (record.status === 'needs_review') s.needsReview += 1;

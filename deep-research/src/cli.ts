@@ -71,11 +71,11 @@ program
 
     console.error(
       chalk.bold.cyan(`\n  research enrich — ${tasks.length} hôtels`) +
-        chalk.gray(`  (${config.geminiModel}${notion ? ', → Notion' : ', local'})`),
+        chalk.gray(`  (${config.geminiModel} · recherche: ${config.searchProvider}${notion ? ' · → Notion' : ' · local'})`),
     );
-    if (!config.geminiSearch) {
+    if (config.searchProvider === 'none') {
       console.error(
-        chalk.yellow('  ⚠ GEMINI_SEARCH=false : réponses issues des connaissances du modèle, sans sources web (moins fiable)'),
+        chalk.yellow('  ⚠ SEARCH_PROVIDER=none : réponses issues des connaissances du modèle, sans sources web (moins fiable)'),
       );
     }
     console.error('');

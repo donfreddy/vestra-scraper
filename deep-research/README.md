@@ -1,14 +1,26 @@
 # hotel-deep-research
 
 Outil **séparé** de vestra. Il ne scrappe pas : il prend une **liste de noms d'hôtels**,
-lance une **recherche web d'investigation via Gemini** (avec Google Search) pour retrouver
+fait une **recherche web** (DuckDuckGo, gratuite) puis demande à **Gemini** d'en extraire
 ce que le scraping ne donne pas — **propriétaire / promoteur, direction, quartier, BP,
-géolocalisation, email** — puis pousse le tout dans **Notion** (une base, filtrable par ville).
+géolocalisation, email, site web** — et pousse le tout dans **Notion** (une base,
+filtrable par ville).
 
-> ⚠️ Les champs *propriétaire* et *direction* sont les plus sujets à hallucination. Chaque
-> ligne porte une **confiance gouvernance** (0–1) et un **statut** (`Auto` / `À vérifier`).
-> Traite « À vérifier » comme des pistes, pas comme des faits — un appel téléphonique
-> reste nécessaire pour les petits établissements.
+> ⚠️ Les champs *propriétaire* et *direction* sont les plus sujets à hallucination. Le
+> prompt interdit à Gemini de compléter avec ses connaissances générales — il doit se
+> baser uniquement sur les pages trouvées. Chaque ligne porte quand même une **confiance
+> gouvernance** (0–1) et un **statut** (`Auto` / `À vérifier`). Traite « À vérifier »
+> comme des pistes, pas comme des faits.
+
+## Comment ça marche (par défaut, 100 % gratuit)
+
+```text
+nom d'hôtel → recherche DuckDuckGo → extraits + pages → Gemini (JSON structuré) → Notion
+```
+
+Pas de clé de recherche, pas de facturation Google : DuckDuckGo est interrogé directement
+(point d'entrée HTML public), et le contexte trouvé est injecté dans le prompt Gemini —
+qui répond en JSON strict (`responseSchema`) au lieu de deviner de mémoire.
 
 ## Installation
 
@@ -30,8 +42,9 @@ lancé séparément.
 | `NOTION_API_KEY` | [notion.so/my-integrations](https://www.notion.so/my-integrations) → *New integration* | Non |
 | `NOTION_DATABASE_ID` | 32 caractères dans l'URL de la base, entre le dernier `/` et le `?` | — |
 
-Après avoir créé l'intégration Notion : ouvre ta base → menu `•••` → **Connections** →
-ajoute l'intégration (sinon l'API renvoie 404).
+Aucune clé n'est requise pour la recherche web (DuckDuckGo). Après avoir créé
+l'intégration Notion : ouvre ta base → menu `•••` → **Connections** → ajoute
+l'intégration (sinon l'API renvoie 404).
 
 ## Schéma de la base Notion (à créer, casse exacte)
 
@@ -62,6 +75,10 @@ ajoute l'intégration (sinon l'API renvoie 404).
 ```bash
 yarn cli discover -c "Douala:Cameroun" -c "Yaoundé:Cameroun" -c "Abidjan:Côte d'Ivoire" -o hotels.json
 ```
+
+> Pour une liste vraiment exhaustive, **`vestra extract`** (scraping Google Maps) reste
+> plus fiable que `discover` — utilise `discover` comme point de départ à relire, pas
+> comme source de vérité.
 
 Ou pars du fichier envoyé par ton boss, au format [`hotels.example.json`](./hotels.example.json) :
 
@@ -94,31 +111,34 @@ Relance la même commande → les hôtels déjà faits sont sautés. `--force` p
 `enrich --notion` fait un *upsert* (query par Slug → update ou create), donc relancer ne
 crée pas de doublons.
 
+## `SEARCH_PROVIDER` (`.env`)
+
+| Valeur | Coût | Comment |
+| --- | --- | --- |
+| `duckduckgo` (défaut) | **Gratuit** | Recherche DuckDuckGo + pages → contexte → Gemini structuré |
+| `google` | ~35 $/1000 requêtes | Google Search grounding natif de Gemini — sources potentiellement plus complètes, mais quasi jamais couvert par le tier gratuit |
+| `none` | Gratuit | Aucune recherche — Gemini répond seul. Fallback de secours : tout est marqué `À vérifier`, confiance plafonnée. |
+
+`SEARCH_MAX_RESULTS` (défaut 6) et `SEARCH_FETCH_PAGES` (défaut 2) réglent la profondeur
+de la recherche DuckDuckGo par hôtel.
+
+Quelle que soit l'option, **si aucune source n'est trouvée pour un hôtel donné**, son
+statut passe automatiquement en `À vérifier` (pas de confiance sans preuve).
+
 ## Durée / quota
 
-~1 requête Gemini par hôtel + pause `REQUEST_INTERVAL_MS` (défaut 4,5 s). ~100 hôtels
-≈ 8–10 min. `discover` consomme 1 requête par ville.
-
-### Erreur 429 / « quota dépassé » dès le 1ᵉʳ appel
-
-Le **Google Search grounding** (`GEMINI_SEARCH=true`) n'est en général **pas couvert par
-le tier gratuit** — d'où un 429 immédiat. Trois options :
-
-1. **Activer la facturation** sur le projet Google AI (pay-as-you-go). Le grounding coûte
-   ~35 $/1000 requêtes → ~3,5 $ pour 100 hôtels. C'est l'option qui donne les vraies sources.
-2. **`GEMINI_SEARCH=false`** dans `.env` : le modèle répond de mémoire. Marche sur le free
-   tier, plus rapide, **mais sans sources et plus sujet à hallucination** — à réserver au
-   dégrossissage, tout passe en `À vérifier`.
-3. Attendre 24 h si c'est le quota **journalier** de requêtes qui est atteint (pas le grounding).
-
-Pour tester sans consommer : `GEMINI_SEARCH=false yarn cli enrich -i hotels.json --limit 1`.
+~1 recherche DuckDuckGo + 1 requête Gemini par hôtel, + pause `REQUEST_INTERVAL_MS`
+(défaut 4,5 s, sous la limite free tier Gemini de 15 req/min). ~100 hôtels ≈ 10–15 min.
 
 ## Limites
 
+- **Couverture DuckDuckGo** : moins exhaustif que l'index Google sur certaines sources
+  locales africaines. Pour les gros volumes où la qualité prime, `SEARCH_PROVIDER=google`
+  (payant) reste l'option la plus complète.
 - **Gouvernance non publique** : pour un hôtel de quartier sans presse ni site, `owner`
-  et `management` seront `null` → statut `À vérifier`.
-- **Gemini ne combine pas** Google Search et sortie JSON stricte : on demande le JSON
-  dans le texte et on le parse défensivement (Zod). Rare cas de réponse non parsable →
-  l'hôtel est compté en échec et repris au prochain run.
+  et `management` resteront `null` → statut `À vérifier`. C'est le comportement voulu :
+  mieux vaut `null` qu'un nom inventé.
 - Le `Slug` déduplique par ville : deux hôtels réellement homonymes dans la même ville
   se collent — arrive quasi jamais, renomme l'un dans la liste d'entrée si besoin.
+- DuckDuckGo peut throttle en cas de gros volume — le code retente 2 fois puis dégrade
+  en contexte vide (l'hôtel est quand même traité, juste sans web).

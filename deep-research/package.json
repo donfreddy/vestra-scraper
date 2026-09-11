@@ -19,6 +19,7 @@
     "@google/genai": "^2.21.0",
     "@notionhq/client": "^2.3.0",
     "chalk": "^6.0.0",
+    "cheerio": "^1.2.0",
     "commander": "^15.0.0",
     "dotenv": "^17.4.2",
     "libphonenumber-js": "^1.11.9",

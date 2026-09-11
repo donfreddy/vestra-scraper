@@ -1,6 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type, type Schema } from '@google/genai';
 import pRetry, { AbortError } from 'p-retry';
 import { geminiHotelSchema, type GeminiHotel, type HotelTask } from './types.js';
+import type { WebContext } from './websearch.js';
 
 export function createGemini(apiKey: string): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
@@ -9,8 +10,6 @@ export function createGemini(apiKey: string): GoogleGenAI {
 interface CallOptions {
   model: string;
   maxRetries: number;
-  /** Utiliser Google Search grounding (nécessite le tier payant Gemini pour certains modèles). */
-  search: boolean;
 }
 
 export interface EnrichResult {
@@ -18,26 +17,9 @@ export interface EnrichResult {
   sources: string[];
 }
 
-/** Extrait le premier objet JSON d'une réponse LLM (souvent entouré de texte). */
-function extractJson(text: string): unknown {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced ? fenced[1]! : text;
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) throw new Error('aucun JSON dans la réponse');
-  return JSON.parse(candidate.slice(start, end + 1));
-}
-
-function collectSources(response: unknown): string[] {
-  const chunks =
-    (response as { candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string } }> } }> })
-      ?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
-  const urls = new Set<string>();
-  for (const c of chunks) {
-    if (c.web?.uri) urls.add(c.web.uri);
-  }
-  return [...urls].slice(0, 8);
-}
+// ------------------------------------------------------------------
+// Erreurs
+// ------------------------------------------------------------------
 
 function errorText(error: unknown): string {
   return String((error as Error)?.message ?? error).toLowerCase();
@@ -59,39 +41,26 @@ function isPermanent(error: unknown): boolean {
   return /api key|permission|invalid argument|unauthenticated/.test(msg);
 }
 
-function friendlyError(error: unknown, searchOn: boolean): Error {
+function friendlyError(error: unknown, usedGoogleGrounding: boolean): Error {
   if (isQuotaExhausted(error)) {
-    const hint = searchOn
+    const hint = usedGoogleGrounding
       ? "Quota Gemini dépassé. Le Google Search grounding n'est pas couvert par le tier gratuit sur ce modèle. " +
-        'Options : activer la facturation sur ton projet Google AI, OU mettre GEMINI_SEARCH=false dans .env ' +
-        "(recherche via les connaissances du modèle seulement, sans sources — moins fiable)."
-      : 'Quota Gemini dépassé (requêtes/jour du tier gratuit). Réessaie demain ou active la facturation.';
+        'Options : activer la facturation sur ton projet Google AI, OU utiliser SEARCH_PROVIDER=duckduckgo ' +
+        '(recherche web gratuite, sans clé, déjà le mode par défaut).'
+      : 'Quota Gemini dépassé (requêtes/jour du tier gratuit). Réessaie demain, ou espace les requêtes ' +
+        '(REQUEST_INTERVAL_MS plus grand).';
     return new Error(hint);
   }
   return error instanceof Error ? error : new Error(String(error));
 }
 
-async function callGemini(
-  ai: GoogleGenAI,
-  prompt: string,
-  { model, maxRetries, search }: CallOptions,
-): Promise<{ text: string; sources: string[] }> {
+async function withRetry<T>(fn: () => Promise<T>, maxRetries: number, usedGoogleGrounding: boolean): Promise<T> {
   return pRetry(
     async () => {
       try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            temperature: 0.2,
-            ...(search ? { tools: [{ googleSearch: {} }] } : {}),
-          },
-        });
-        const text = response.text ?? '';
-        if (!text.trim()) throw new Error('réponse Gemini vide');
-        return { text, sources: search ? collectSources(response) : [] };
+        return await fn();
       } catch (error) {
-        if (isPermanent(error)) throw new AbortError(friendlyError(error, search));
+        if (isPermanent(error)) throw new AbortError(friendlyError(error, usedGoogleGrounding));
         throw error;
       }
     },
@@ -99,7 +68,152 @@ async function callGemini(
   );
 }
 
-const ENRICH_KEYS = [
+// ------------------------------------------------------------------
+// Schéma de sortie structurée (utilisable dès qu'aucun `tool` n'est actif —
+// Gemini interdit de combiner `googleSearch` et `responseSchema`).
+// ------------------------------------------------------------------
+
+const HOTEL_RESPONSE_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    name: { type: Type.STRING, nullable: true },
+    category: { type: Type.STRING, nullable: true, description: 'Nombre d’étoiles ou standing' },
+    phone: { type: Type.STRING, nullable: true },
+    email: { type: Type.STRING, nullable: true },
+    website: { type: Type.STRING, nullable: true },
+    district: { type: Type.STRING, nullable: true },
+    address: { type: Type.STRING, nullable: true },
+    latitude: { type: Type.NUMBER, nullable: true },
+    longitude: { type: Type.NUMBER, nullable: true },
+    owner: { type: Type.STRING, nullable: true, description: 'Propriétaire, promoteur ou groupe hôtelier parent' },
+    management: { type: Type.STRING, nullable: true, description: 'Directeur général / gérant actuel' },
+    governance_confidence: {
+      type: Type.NUMBER,
+      description: '0 à 1 : confiance réelle sur owner + management d’après les sources fournies',
+    },
+  },
+  required: ['name'],
+};
+
+const DISCOVERY_RESPONSE_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    hotels: { type: Type.ARRAY, items: { type: Type.STRING } },
+  },
+  required: ['hotels'],
+};
+
+function parseJsonResponse(text: string | undefined): unknown {
+  const raw = (text ?? '').trim();
+  if (!raw) throw new Error('réponse Gemini vide');
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start === -1 || end === -1 || end < start) throw new Error('réponse Gemini non-JSON');
+    return JSON.parse(raw.slice(start, end + 1));
+  }
+}
+
+// ------------------------------------------------------------------
+// Mode par défaut (gratuit) : contexte DuckDuckGo -> sortie structurée
+// ------------------------------------------------------------------
+
+/**
+ * Enrichit un hôtel à partir d'un contexte web déjà collecté (DuckDuckGo).
+ * Le prompt interdit explicitement de compléter avec des connaissances
+ * générales non confirmées par le contexte, pour limiter l'hallucination.
+ */
+export async function enrichHotelFromContext(
+  ai: GoogleGenAI,
+  task: HotelTask,
+  context: WebContext,
+  opts: CallOptions,
+): Promise<EnrichResult> {
+  const prompt = `Tu es un analyste d'investigation B2B. On te donne des résultats de recherche web concernant
+l'établissement hôtelier "${task.inputName}", situé à ${task.city}, ${task.country}.
+
+${context.text || '(Aucun résultat web trouvé pour cette recherche.)'}
+
+Consignes strictes :
+- Base-toi UNIQUEMENT sur les informations ci-dessus. N'utilise PAS de connaissances générales non confirmées ici.
+- Si une information n'apparaît pas explicitement dans le contexte, renvoie null pour ce champ.
+- N'invente jamais un nom de propriétaire ou de directeur : si le contexte ne le cite pas nommément, mets null.
+- governance_confidence : 0 si le contexte ne mentionne pas explicitement owner/management, proche de 1 si une source cite un nom précis avec son rôle.`;
+
+  const data = await withRetry(
+    async () => {
+      const response = await ai.models.generateContent({
+        model: opts.model,
+        contents: prompt,
+        config: { responseMimeType: 'application/json', responseSchema: HOTEL_RESPONSE_SCHEMA, temperature: 0.1 },
+      });
+      return geminiHotelSchema.parse(parseJsonResponse(response.text));
+    },
+    opts.maxRetries,
+    false,
+  );
+
+  return { data, sources: context.sources };
+}
+
+/** Extrait des noms d'hôtels plausibles à partir d'un contexte web DuckDuckGo agrégé. */
+export async function discoverHotelsFromContext(
+  ai: GoogleGenAI,
+  city: string,
+  country: string,
+  context: WebContext,
+  opts: CallOptions,
+): Promise<{ hotels: string[] }> {
+  const prompt = `Voici des résultats de recherche web sur les hôtels de ${city}, ${country} :
+
+${context.text || '(aucun résultat)'}
+
+À partir de CES résultats uniquement, extrait la liste des noms officiels d'établissements
+hôteliers distincts qui y sont cités (pas de doublons, pas de résidences purement privées).
+Si le contexte ne permet d'identifier aucun hôtel, renvoie une liste vide.`;
+
+  const parsed = await withRetry(
+    async () => {
+      const response = await ai.models.generateContent({
+        model: opts.model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: DISCOVERY_RESPONSE_SCHEMA,
+          temperature: 0.1,
+        },
+      });
+      return parseJsonResponse(response.text) as { hotels?: unknown };
+    },
+    opts.maxRetries,
+    false,
+  );
+
+  const hotels = Array.isArray(parsed.hotels)
+    ? parsed.hotels.filter((h): h is string => typeof h === 'string' && h.trim().length > 1).map((h) => h.trim())
+    : [];
+  return { hotels: [...new Set(hotels)] };
+}
+
+// ------------------------------------------------------------------
+// Mode payant : Google Search grounding natif de Gemini (SEARCH_PROVIDER=google)
+// ------------------------------------------------------------------
+
+function collectGroundingSources(response: unknown): string[] {
+  const chunks =
+    (
+      response as {
+        candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string } }> } }>;
+      }
+    )?.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+  const urls = new Set<string>();
+  for (const c of chunks) if (c.web?.uri) urls.add(c.web.uri);
+  return [...urls].slice(0, 8);
+}
+
+const GROUNDED_ENRICH_KEYS = [
   'name (nom officiel exact)',
   'category (nombre d’étoiles ou standing, ex: "4 étoiles")',
   'phone (numéro principal, format international si possible)',
@@ -114,48 +228,67 @@ const ENRICH_KEYS = [
   'governance_confidence (nombre 0 à 1 : ta confiance réelle sur owner + management)',
 ];
 
-export async function enrichHotel(
-  ai: GoogleGenAI,
-  task: HotelTask,
-  opts: CallOptions,
-): Promise<EnrichResult> {
+export async function enrichHotelGrounded(ai: GoogleGenAI, task: HotelTask, opts: CallOptions): Promise<EnrichResult> {
   const prompt = `Tu es un analyste d'investigation B2B. Effectue une recherche web approfondie sur l'établissement hôtelier :
 "${task.inputName}", situé à ${task.city}, ${task.country}.
 
-Croise Google Maps, les sites de réservation, la presse locale (Cameroon Tribune, Investir au Cameroun, Fraternité Matin…), LinkedIn et les registres d'entreprises.
+Croise Google Maps, les sites de réservation, la presse locale, LinkedIn et les registres d'entreprises.
 
 Renvoie UNIQUEMENT un objet JSON valide (aucun texte autour) avec ces clés :
-${ENRICH_KEYS.map((k) => `- ${k}`).join('\n')}
+${GROUNDED_ENRICH_KEYS.map((k) => `- ${k}`).join('\n')}
 
 Règles :
 - Si une information est réellement introuvable, mets null (n'invente jamais un nom de propriétaire ou de directeur).
-- governance_confidence doit refléter honnêtement la fiabilité de tes sources pour owner et management (0 = pure supposition, 1 = source officielle explicite).`;
+- governance_confidence doit refléter honnêtement la fiabilité de tes sources pour owner et management.`;
 
-  const { text, sources } = await callGemini(ai, prompt, opts);
-  const data = geminiHotelSchema.parse(extractJson(text));
+  const { text, sources } = await withRetry(
+    async () => {
+      const response = await ai.models.generateContent({
+        model: opts.model,
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+      });
+      const t = response.text ?? '';
+      if (!t.trim()) throw new Error('réponse Gemini vide');
+      return { text: t, sources: collectGroundingSources(response) };
+    },
+    opts.maxRetries,
+    true,
+  );
+
+  const data = geminiHotelSchema.parse(parseJsonResponse(text));
   return { data, sources };
 }
 
-export interface DiscoverResult {
-  hotels: string[];
-  sources: string[];
-}
-
-export async function discoverHotels(
+export async function discoverHotelsGrounded(
   ai: GoogleGenAI,
   city: string,
   country: string,
   opts: CallOptions,
-): Promise<DiscoverResult> {
+): Promise<{ hotels: string[] }> {
   const prompt = `Effectue une recherche exhaustive et liste TOUS les établissements hôteliers connus (hôtels 1 à 5 étoiles, résidences hôtelières de standing, complexes) situés à ${city}, ${country}.
 
 Renvoie UNIQUEMENT un objet JSON valide : { "hotels": ["Nom officiel 1", "Nom officiel 2", ...] }
 - Uniquement les noms officiels exacts, sans doublon, sans les résidences purement privées.`;
 
-  const { text, sources } = await callGemini(ai, prompt, opts);
-  const parsed = extractJson(text) as { hotels?: unknown };
+  const { text } = await withRetry(
+    async () => {
+      const response = await ai.models.generateContent({
+        model: opts.model,
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+      });
+      const t = response.text ?? '';
+      if (!t.trim()) throw new Error('réponse Gemini vide');
+      return { text: t };
+    },
+    opts.maxRetries,
+    true,
+  );
+
+  const parsed = parseJsonResponse(text) as { hotels?: unknown };
   const hotels = Array.isArray(parsed.hotels)
     ? parsed.hotels.filter((h): h is string => typeof h === 'string' && h.trim().length > 1).map((h) => h.trim())
     : [];
-  return { hotels: [...new Set(hotels)], sources };
+  return { hotels: [...new Set(hotels)] };
 }
